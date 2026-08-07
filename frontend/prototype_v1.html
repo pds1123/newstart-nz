@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NewStart NZ — Auckland Housing Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #F5F4F0;
+  --surface:   #FFFFFF;
+  --border:    #E3E1DA;
+  --text:      #0F1C18;
+  --muted:     #6B7878;
+  --faint:     #A8B5B0;
+
+  --green-dark: #085041;
+  --green:      #1D9E75;
+  --green-mid:  #5DCAA5;
+  --green-light:#9FE1CB;
+  --green-pale: #E6F7F1;
+
+  --amber:      #EF9F27;
+  --red:        #E24B4A;
+  --red-pale:   #FEF0F0;
+
+  --nav-h:    52px;
+  --sidebar-w:280px;
+  --radius:   10px;
+  --radius-sm:6px;
+}
+
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  height: var(--nav-h); background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 0;
+}
+.nav-logo {
+  font-size: 15px; font-weight: 700; color: var(--green-dark);
+  letter-spacing: -0.3px; margin-right: 28px; white-space: nowrap;
+}
+.nav-logo span { color: var(--green); }
+.nav-links { display: flex; gap: 2px; flex: 1; }
+.nav-link {
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  cursor: pointer; transition: all 0.12s; border: none; background: none;
+  text-decoration: none;
+}
+.nav-link:hover { background: var(--bg); color: var(--text); }
+.nav-link.active { background: var(--green-pale); color: var(--green-dark); font-weight: 600; }
+.nav-right { display: flex; align-items: center; gap: 10px; }
+.nav-city {
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 13px; color: var(--text); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-weight: 500;
+}
+.nav-city svg { color: var(--muted); }
+.nav-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--green-pale); border: 1.5px solid var(--green-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--green-dark); cursor: pointer;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; height: 100vh; padding-top: var(--nav-h); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section:last-child { border-bottom: none; flex: 1; overflow-y: auto; }
+
+/* Search */
+.search-wrap { position: relative; }
+.search-input {
+  width: 100%; padding: 8px 12px 8px 34px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); font-size: 13px; color: var(--text);
+  outline: none; transition: border-color 0.12s;
+  font-family: inherit;
+}
+.search-input:focus { border-color: var(--green-mid); background: var(--surface); }
+.search-input::placeholder { color: var(--faint); }
+.search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--faint); pointer-events: none;
+}
+.search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  color: var(--faint); cursor: pointer; font-size: 14px; line-height: 1;
+  display: none; background: none; border: none; padding: 2px 4px;
+}
+.search-clear:hover { color: var(--text); }
+.search-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 2000; overflow: hidden; display: none;
+}
+.search-results.open { display: block; }
+.search-result-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; cursor: pointer; transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--bg); }
+.sr-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sr-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.sr-meta { font-size: 11px; color: var(--muted); }
+.sr-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; padding: 2px 6px; border-radius: 3px;
+}
+.sr-tag.inner { background: var(--green-pale); color: var(--green-dark); }
+.sr-tag.suburban { background: #f0f9f5; color: #2d7a5e; border: 1px solid var(--green-light); }
+.search-no-results { padding: 12px; font-size: 13px; color: var(--muted); text-align: center; }
+
+.filter-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.7px;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 9px;
+}
+.pill-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  cursor: pointer; transition: all 0.12s;
+}
+.pill:hover { border-color: var(--green-light); color: var(--green-dark); }
+.pill.active {
+  background: var(--green-pale); border-color: var(--green-mid);
+  color: var(--green-dark); font-weight: 600;
+}
+
+/* Budget slider */
+.slider-wrap { padding: 4px 0; }
+.slider-value {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.slider-current { font-size: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.slider-range { font-size: 11px; color: var(--muted); }
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--green) 0%, var(--green) var(--pct, 60%), var(--border) var(--pct, 60%), var(--border) 100%);
+  outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--green);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+/* View toggle */
+.view-toggle { display: flex; background: var(--bg); border-radius: var(--radius-sm); padding: 3px; gap: 2px; }
+.view-btn {
+  flex: 1; padding: 6px 10px; border-radius: 5px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: none; background: none; color: var(--muted); transition: all 0.12s;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.view-btn.active { background: var(--surface); color: var(--green-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+/* Leaderboard */
+.lb-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+}
+.lb-title { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--faint); }
+.lb-sub { font-size: 10px; color: var(--faint); }
+
+.lb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 4px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s; border-radius: 6px;
+}
+.lb-item:hover { background: var(--bg); }
+.lb-item:last-child { border-bottom: none; }
+.lb-rank { font-size: 10px; font-weight: 700; color: var(--faint); width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.lb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.lb-name { font-size: 13px; font-weight: 500; flex: 1; color: var(--text); }
+.lb-val { font-size: 13px; font-weight: 700; color: var(--green-dark); font-variant-numeric: tabular-nums; }
+.lb-val.crime { color: var(--red); }
+
+/* ── MAP AREA ── */
+.map-wrap { flex: 1; position: relative; overflow: hidden; }
+#map { width: 100%; height: 100%; }
+
+/* KPI floating bar */
+.kpi-bar {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 900; display: flex; gap: 8px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.kpi-card { padding: 0 14px; border-right: 1px solid var(--border); }
+.kpi-card:first-child { padding-left: 0; }
+.kpi-card:last-child { border-right: none; padding-right: 0; }
+.kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--faint); margin-bottom: 3px; }
+.kpi-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.kpi-value.green { color: var(--green-dark); }
+.kpi-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* Tooltip */
+.map-tooltip {
+  position: absolute; pointer-events: none; z-index: 950;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 180px;
+  transition: opacity 0.1s; opacity: 0;
+}
+.map-tooltip.visible { opacity: 1; }
+.tt-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.tt-zone { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.tt-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+.tt-row:last-child { margin-bottom: 0; }
+.tt-key { font-size: 11px; color: var(--muted); }
+.tt-val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tt-val.rent { color: var(--green-dark); }
+.tt-val.crime { color: var(--red); }
+.tt-hint { font-size: 10px; color: var(--faint); margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+/* Legend */
+.map-legend {
+  position: absolute; bottom: 24px; right: 14px; z-index: 900;
+  background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.legend-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--faint); margin-bottom: 8px; }
+.legend-scale { height: 6px; border-radius: 3px; width: 160px; margin-bottom: 5px; }
+.legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Leaflet overrides */
+.leaflet-container { background: var(--bg) !important; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { display: none !important; }
+.leaflet-control-zoom a {
+  background: var(--surface) !important; border-color: var(--border) !important;
+  color: var(--muted) !important; font-weight: 600;
+}
+.leaflet-control-zoom a:hover { background: var(--bg) !important; color: var(--text) !important; }
+.leaflet-control-attribution { background: rgba(255,255,255,0.8) !important; color: var(--faint) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--faint) !important; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">NewStart <span>NZ</span></div>
+  <div class="nav-links">
+    <a class="nav-link active">Map</a>
+    <a class="nav-link">AI Agent</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-city">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M6 1a3.5 3.5 0 0 1 3.5 3.5C9.5 7.5 6 11 6 11S2.5 7.5 2.5 4.5A3.5 3.5 0 0 1 6 1z" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="6" cy="4.5" r="1.2" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      Auckland
+    </div>
+    <div class="nav-avatar">NZ</div>
+  </div>
+</nav>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <div class="search-wrap" id="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input class="search-input" id="search-input" type="text" placeholder="Search suburbs…"
+          oninput="onSearch(this.value)" onfocus="onSearchFocus()" autocomplete="off"/>
+        <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="filter-label">Bedrooms</div>
+      <div class="pill-row" id="bed-group">
+        <div class="pill" data-bed="1" onclick="setBed(this)">1 bed</div>
+        <div class="pill active" data-bed="2" onclick="setBed(this)">2 bed</div>
+        <div class="pill" data-bed="3" onclick="setBed(this)">3 bed</div>
+        <div class="pill" data-bed="4" onclick="setBed(this)">4 bed+</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="filter-label">Dwelling Type</div>
+      <div class="pill-row" id="dwell-group">
+        <div class="pill active" data-dwell="All" onclick="setDwell(this)">All</div>
+        <div class="pill" data-dwell="House" onclick="setDwell(this)">House</div>
+        <div class="pill" data-dwell="Apartment" onclick="setDwell(this)">Apartment</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="filter-label">Map View</div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-rent" onclick="setView('rent')">
+          <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v6M4.5 4.5h2a.5.5 0 0 1 0 1H5a.5.5 0 0 0 0 1h2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          Rent
+        </button>
+        <button class="view-btn" id="btn-safety" onclick="setView('safety')">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1L2 3v3c0 2.5 1.7 4.5 4 5 2.3-.5 4-2.5 4-5V3L6 1z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          Safety
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="filter-label">Budget / week</div>
+      <div class="slider-wrap">
+        <div class="slider-value">
+          <span class="slider-current" id="slider-display">$650</span>
+          <span class="slider-range">$300 – $1,200</span>
+        </div>
+        <input type="range" id="budget-slider" min="300" max="1200" value="650" step="25" oninput="onSlider(this)">
+      </div>
+    </div>
+
+    <div class="sidebar-section" id="leaderboard-section">
+      <div class="lb-header">
+        <span class="lb-title" id="lb-title">Most affordable</span>
+        <span class="lb-sub" id="lb-sub">2 bed · All</span>
+      </div>
+      <div id="leaderboard"></div>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- KPI Bar -->
+    <div class="kpi-bar">
+      <div class="kpi-card">
+        <div class="kpi-label">Auckland median</div>
+        <div class="kpi-value" id="kpi-median">$623</div>
+        <div class="kpi-sub" id="kpi-median-sub">2 bed · All types</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Most affordable</div>
+        <div class="kpi-value green" id="kpi-cheap">Otara</div>
+        <div class="kpi-sub" id="kpi-cheap-sub">$583/wk</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Safest suburb</div>
+        <div class="kpi-value green" id="kpi-safe">Glendowie</div>
+        <div class="kpi-sub">25 incidents 2025</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Best value</div>
+        <div class="kpi-value green" id="kpi-best">Kingsland</div>
+        <div class="kpi-sub">Low crime · Mid rent</div>
+      </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="map-tooltip" id="tooltip">
+      <div class="tt-name" id="tt-name">Mt Eden</div>
+      <div class="tt-zone" id="tt-zone">Inner City</div>
+      <div class="tt-row">
+        <span class="tt-key">Median rent</span>
+        <span class="tt-val rent" id="tt-rent">$623/wk</span>
+      </div>
+      <div class="tt-row">
+        <span class="tt-key">Type</span>
+        <span class="tt-val" id="tt-type">2 bed · All</span>
+      </div>
+      <div class="tt-row">
+        <span class="tt-key">Crime 2025</span>
+        <span class="tt-val crime" id="tt-crime">847</span>
+      </div>
+      <div class="tt-hint">Click for full suburb detail →</div>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <div class="legend-title" id="legend-title">Weekly rent · 2 bed</div>
+      <div class="legend-scale" id="legend-scale" style="background:linear-gradient(to right,#085041,#1D9E75,#9FE1CB,#EF9F27,#E24B4A)"></div>
+      <div class="legend-labels">
+        <span id="legend-min">$400</span>
+        <span id="legend-max">$1,000+</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const SUBURB_DATA = [{"suburb":"Auckland Central","lat":-36.8485,"lng":174.7633,"zone":"inner","crime_2025":4914,"rent":{"House":{"1":570,"2":705,"3":630,"4":1415,"All":641},"Apartment":{"1":484,"2":632,"3":787,"4":269,"All":487}}},{"suburb":"Grafton","lat":-36.863,"lng":174.77,"zone":"inner","crime_2025":342,"rent":{"House":{"1":295,"3":810,"4":988,"All":300},"Apartment":{"1":435,"2":650}}},{"suburb":"Parnell","lat":-36.855,"lng":174.78,"zone":"inner","crime_2025":248,"rent":{"House":{"1":694,"2":795,"3":940,"4":1110,"All":905},"Apartment":{"1":509,"2":708,"3":1012}}},{"suburb":"Newmarket","lat":-36.871,"lng":174.776,"zone":"inner","crime_2025":1198,"rent":{"House":{"1":580,"2":695,"3":900,"4":1225,"All":630},"Apartment":{"1":498,"2":638,"3":790,"All":630}}},{"suburb":"Remuera","lat":-36.88,"lng":174.795,"zone":"inner","crime_2025":528,"rent":{"House":{"1":791,"2":716,"3":877,"4":1114,"All":929},"Apartment":{"2":648,"3":1800}}},{"suburb":"Epsom","lat":-36.894,"lng":174.77,"zone":"inner","crime_2025":450,"rent":{"House":{"1":649,"2":641,"3":861,"4":1069,"All":908},"Apartment":{"1":530,"2":663,"3":772}}},{"suburb":"Mt Eden","lat":-36.883,"lng":174.753,"zone":"inner","crime_2025":510,"rent":{"House":{"1":523,"2":667,"3":809,"4":1051,"All":805},"Apartment":{"1":500,"2":623,"3":1190}}},{"suburb":"Kingsland","lat":-36.872,"lng":174.744,"zone":"inner","crime_2025":184,"rent":{"House":{"1":699,"2":780,"3":835,"4":900,"All":830},"Apartment":{"1":568,"2":655}}},{"suburb":"Sandringham","lat":-36.888,"lng":174.743,"zone":"inner","crime_2025":1664,"rent":{"House":{"1":677,"2":599,"3":743,"4":940,"All":767},"Apartment":{"1":485,"2":559}}},{"suburb":"Grey Lynn","lat":-36.864,"lng":174.742,"zone":"inner","crime_2025":1195,"rent":{"House":{"1":560,"2":786,"3":876,"4":881,"All":765},"Apartment":{"1":578,"2":753,"3":1200,"All":690}}},{"suburb":"Ponsonby","lat":-36.856,"lng":174.744,"zone":"inner","crime_2025":566,"rent":{"House":{"1":595,"2":795,"3":1083,"4":1305,"All":1308},"Apartment":{"1":549,"2":691}}},{"suburb":"Arch Hill","lat":-36.868,"lng":174.738,"zone":"inner","crime_2025":null,"rent":{"House":{},"Apartment":{}}},{"suburb":"Eden Terrace","lat":-36.867,"lng":174.752,"zone":"inner","crime_2025":101,"rent":{"House":{"1":523,"2":695,"3":800,"All":590},"Apartment":{"1":495,"2":630,"3":860,"All":675}}},{"suburb":"Balmoral","lat":-36.894,"lng":174.755,"zone":"inner","crime_2025":300,"rent":{"House":{"1":520,"2":600,"3":828,"4":970,"All":900},"Apartment":{"1":490,"2":750}}},{"suburb":"Mt Albert","lat":-36.889,"lng":174.728,"zone":"inner","crime_2025":343,"rent":{"House":{"1":629,"2":612,"3":790,"4":893,"All":723},"Apartment":{"2":568,"All":563}}},{"suburb":"Avondale","lat":-36.901,"lng":174.714,"zone":"inner","crime_2025":327,"rent":{"House":{"1":604,"2":592,"3":684,"4":786,"All":693},"Apartment":{"1":533,"2":550}}},{"suburb":"New Lynn","lat":-36.908,"lng":174.686,"zone":"inner","crime_2025":1279,"rent":{"House":{"1":529,"2":566,"3":654,"4":722,"All":586},"Apartment":{"1":442,"2":538}}},{"suburb":"Onehunga","lat":-36.926,"lng":174.784,"zone":"inner","crime_2025":888,"rent":{"House":{"1":618,"2":596,"3":744,"4":813,"All":724},"Apartment":{"1":560,"2":605,"4":240,"All":605}}},{"suburb":"Penrose","lat":-36.919,"lng":174.8,"zone":"inner","crime_2025":2852,"rent":{"House":{"2":545,"3":750,"4":740},"Apartment":{}}},{"suburb":"Otahuhu","lat":-36.952,"lng":174.831,"zone":"inner","crime_2025":730,"rent":{"House":{"1":487,"2":550,"3":684,"4":644,"All":642},"Apartment":{"1":368,"2":520}}},{"suburb":"Glen Innes","lat":-36.885,"lng":174.853,"zone":"inner","crime_2025":1139,"rent":{"House":{"1":545,"2":528,"3":691,"4":839,"All":679},"Apartment":{"1":650,"2":670}}},{"suburb":"Panmure","lat":-36.899,"lng":174.849,"zone":"inner","crime_2025":643,"rent":{"House":{"1":560,"2":580,"3":675,"4":810,"All":710},"Apartment":{"2":560}}},{"suburb":"Ellerslie","lat":-36.906,"lng":174.818,"zone":"inner","crime_2025":350,"rent":{"House":{"1":555,"2":650,"3":768,"4":872,"All":724},"Apartment":{"1":535,"2":597,"All":560}}},{"suburb":"Greenlane","lat":-36.895,"lng":174.787,"zone":"inner","crime_2025":525,"rent":{"House":{"1":664,"2":625,"3":830,"4":998,"All":932},"Apartment":{"2":584}}},{"suburb":"Royal Oak","lat":-36.914,"lng":174.778,"zone":"inner","crime_2025":353,"rent":{"House":{"1":606,"2":609,"3":742,"4":802,"All":828},"Apartment":{"2":593}}},{"suburb":"Three Kings","lat":-36.908,"lng":174.762,"zone":"inner","crime_2025":940,"rent":{"House":{"2":665,"3":769,"4":940,"All":830},"Apartment":{"1":515,"2":695}}},{"suburb":"Mt Roskill","lat":-36.917,"lng":174.745,"zone":"inner","crime_2025":403,"rent":{"House":{"1":652,"2":588,"3":708,"4":814,"All":735},"Apartment":{"1":525,"2":615}}},{"suburb":"Hillsborough","lat":-36.924,"lng":174.761,"zone":"inner","crime_2025":953,"rent":{"House":{"1":586,"2":620,"3":710,"4":875,"All":800},"Apartment":{"2":553}}},{"suburb":"Blockhouse Bay","lat":-36.931,"lng":174.711,"zone":"inner","crime_2025":595,"rent":{"House":{"1":430,"2":637,"3":702,"4":801,"All":748},"Apartment":{}}},{"suburb":"Point Chevalier","lat":-36.871,"lng":174.716,"zone":"inner","crime_2025":854,"rent":{"House":{"1":720,"2":702,"3":845,"4":1149,"All":848},"Apartment":{"1":510}}},{"suburb":"Waterview","lat":-36.887,"lng":174.721,"zone":"inner","crime_2025":102,"rent":{"House":{"1":565,"2":640,"3":710,"4":850,"All":628},"Apartment":{"2":595,"All":550}}},{"suburb":"St Lukes","lat":-36.879,"lng":174.738,"zone":"inner","crime_2025":420,"rent":{"House":{"1":725,"2":620,"3":768,"All":720},"Apartment":{"1":525,"2":665,"3":700}}},{"suburb":"Meadowbank","lat":-36.872,"lng":174.825,"zone":"inner","crime_2025":151,"rent":{"House":{"1":585,"2":620,"3":795,"4":1100,"All":932},"Apartment":{"1":341,"2":550}}},{"suburb":"St Heliers","lat":-36.86,"lng":174.859,"zone":"inner","crime_2025":204,"rent":{"House":{},"Apartment":{}}},{"suburb":"Mission Bay","lat":-36.858,"lng":174.842,"zone":"inner","crime_2025":167,"rent":{"House":{"1":623,"2":695,"3":920,"4":1220,"All":995},"Apartment":{"1":523,"2":700}}},{"suburb":"Kohimarama","lat":-36.86,"lng":174.848,"zone":"inner","crime_2025":41,"rent":{"House":{"1":580,"2":680,"3":870,"4":1250,"All":925},"Apartment":{"1":510,"2":715,"3":1150}}},{"suburb":"Glendowie","lat":-36.864,"lng":174.868,"zone":"inner","crime_2025":25,"rent":{"House":{"1":750,"2":690,"3":834,"4":1065,"All":952},"Apartment":{}}},{"suburb":"Henderson","lat":-36.875,"lng":174.632,"zone":"suburban","crime_2025":4348,"rent":{"House":{"1":557,"2":561,"3":651,"4":738,"All":620},"Apartment":{"1":470,"2":408}}},{"suburb":"Massey","lat":-36.845,"lng":174.627,"zone":"suburban","crime_2025":780,"rent":{"House":{"1":608,"2":553,"3":653,"4":754,"All":644},"Apartment":{"1":380}}},{"suburb":"West Harbour","lat":-36.818,"lng":174.637,"zone":"suburban","crime_2025":141,"rent":{"House":{"1":630,"2":600,"3":730,"4":825,"All":793},"Apartment":{}}},{"suburb":"Hobsonville","lat":-36.794,"lng":174.657,"zone":"suburban","crime_2025":1172,"rent":{"House":{"1":615,"2":650,"3":755,"4":860,"All":740},"Apartment":{"1":560,"2":620,"All":675}}},{"suburb":"Waitakere","lat":-36.892,"lng":174.571,"zone":"suburban","crime_2025":88,"rent":{"House":{"1":400,"2":535,"3":723},"Apartment":{}}},{"suburb":"Titirangi","lat":-36.939,"lng":174.654,"zone":"suburban","crime_2025":112,"rent":{"House":{"2":650,"3":700,"4":885,"All":850},"Apartment":{}}},{"suburb":"Albany","lat":-36.728,"lng":174.7,"zone":"suburban","crime_2025":3574,"rent":{"House":{"1":732,"2":630,"3":760,"4":907,"All":782},"Apartment":{"1":532,"2":607,"3":806,"All":538}}},{"suburb":"Takapuna","lat":-36.787,"lng":174.77,"zone":"suburban","crime_2025":834,"rent":{"House":{"1":727,"2":645,"3":1008,"4":1165,"All":925},"Apartment":{"1":578,"2":790,"3":965,"All":650}}},{"suburb":"Milford","lat":-36.776,"lng":174.758,"zone":"suburban","crime_2025":164,"rent":{"House":{"1":660,"2":680,"3":850,"4":1210,"All":956},"Apartment":{"2":715}}},{"suburb":"Devonport","lat":-36.829,"lng":174.796,"zone":"suburban","crime_2025":90,"rent":{"House":{"2":795,"3":900,"4":1200},"Apartment":{"2":650}}},{"suburb":"Northcote","lat":-36.812,"lng":174.747,"zone":"suburban","crime_2025":234,"rent":{"House":{"1":648,"2":600,"3":741,"4":927,"All":762},"Apartment":{"1":580,"2":624}}},{"suburb":"Glenfield","lat":-36.782,"lng":174.723,"zone":"suburban","crime_2025":1446,"rent":{"House":{"1":637,"2":609,"3":683,"4":811,"All":734},"Apartment":{"2":544}}},{"suburb":"Browns Bay","lat":-36.724,"lng":174.743,"zone":"suburban","crime_2025":513,"rent":{"House":{"1":594,"2":608,"3":738,"4":883,"All":813},"Apartment":{"2":638}}},{"suburb":"Birkenhead","lat":-36.819,"lng":174.73,"zone":"suburban","crime_2025":166,"rent":{"House":{"1":630,"2":631,"3":788,"4":986,"All":773},"Apartment":{"1":492,"2":576}}},{"suburb":"Beachhaven","lat":-36.808,"lng":174.713,"zone":"suburban","crime_2025":180,"rent":{"House":{"1":624,"2":603,"3":696,"4":787,"All":733},"Apartment":{}}},{"suburb":"Manukau","lat":-36.993,"lng":174.877,"zone":"suburban","crime_2025":5599,"rent":{"House":{"1":465,"2":685,"All":500},"Apartment":{"1":460,"2":550,"All":490}}},{"suburb":"Papatoetoe","lat":-36.983,"lng":174.852,"zone":"suburban","crime_2025":1822,"rent":{"House":{"1":586,"2":596,"3":690,"4":798,"All":657},"Apartment":{"1":390,"2":554}}},{"suburb":"Otara","lat":-36.968,"lng":174.873,"zone":"suburban","crime_2025":1190,"rent":{"House":{"1":578,"2":583,"3":679,"4":765,"All":681},"Apartment":{"2":550,"3":645}}},{"suburb":"Mangere","lat":-36.979,"lng":174.792,"zone":"suburban","crime_2025":2894,"rent":{"House":{"1":498,"2":594,"3":672,"4":787,"All":638},"Apartment":{"2":500}}},{"suburb":"Mangere Bridge","lat":-36.959,"lng":174.786,"zone":"suburban","crime_2025":240,"rent":{"House":{"1":632,"2":628,"3":710,"All":703},"Apartment":{}}},{"suburb":"Botany","lat":-36.932,"lng":174.91,"zone":"suburban","crime_2025":1733,"rent":{"House":{"1":690,"2":602,"3":739,"4":848,"All":789},"Apartment":{"1":465}}},{"suburb":"Howick","lat":-36.902,"lng":174.932,"zone":"suburban","crime_2025":560,"rent":{"House":{"1":627,"2":617,"3":717,"4":805,"All":717},"Apartment":{"1":298,"2":590}}},{"suburb":"Pakuranga","lat":-36.904,"lng":174.909,"zone":"suburban","crime_2025":893,"rent":{"House":{"1":633,"2":595,"3":676,"4":766,"All":686},"Apartment":{"2":546,"3":630}}},{"suburb":"Flat Bush","lat":-36.963,"lng":174.913,"zone":"suburban","crime_2025":null,"rent":{"House":{},"Apartment":{}}},{"suburb":"Dannemora","lat":-36.935,"lng":174.92,"zone":"suburban","crime_2025":629,"rent":{"House":{"1":450,"3":750,"4":850,"All":878},"Apartment":{}}},{"suburb":"Beachlands","lat":-36.902,"lng":175.001,"zone":"suburban","crime_2025":84,"rent":{"House":{},"Apartment":{}}}];
+
+// ── STATE ──
+let currentBed = '2';
+let currentDwell = 'All';
+let currentView = 'rent';
+let currentBudget = 650;
+let markers = {};
+
+// ── HELPERS ──
+function getRent(d) {
+  if (currentDwell === 'All') {
+    const vals = ['House','Apartment'].flatMap(dw => {
+      const v = (d.rent[dw]||{})[currentBed];
+      return v ? [v] : [];
+    });
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b)/vals.length) : null;
+  }
+  return (d.rent[currentDwell]||{})[currentBed] || null;
+}
+
+function lerpColor(stops, t) {
+  t = Math.max(0,Math.min(1,t));
+  const n = stops.length - 1;
+  const i = Math.min(Math.floor(t*n), n-1);
+  const f = t*n - i;
+  return stops[i].map((v,j) => Math.round(v + f*(stops[i+1][j]-v)));
+}
+
+const RENT_STOPS = [[8,80,65],[29,158,117],[93,220,165],[239,159,39],[226,75,74]];
+const CRIME_STOPS = [[29,158,117],[93,220,165],[239,159,39],[226,75,74],[150,20,20]];
+
+function rentColor(v) {
+  if (v==null) return '#D4D0C8';
+  const t = (v-400)/700;
+  return 'rgb('+lerpColor(RENT_STOPS,t).join(',')+')';
+}
+function crimeColor(v) {
+  if (v==null) return '#D4D0C8';
+  return 'rgb('+lerpColor(CRIME_STOPS, Math.log(v+1)/Math.log(5001)).join(',')+')';
+}
+function getColor(d) {
+  return currentView === 'rent' ? rentColor(getRent(d)) : crimeColor(d.crime_2025);
+}
+
+// ── MAP ──
+const map = L.map('map', { center: [-36.86,174.76], zoom: 12, zoomControl: true });
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OSM &copy; CARTO · Rent: MBIE 2025 · Crime: NZ Police 2025',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// Remove default Leaflet attribution branding
+map.attributionControl.setPrefix('');
+
+const tooltip = document.getElementById('tooltip');
+const mapWrap = document.querySelector('.map-wrap');
+
+function buildMarkers() {
+  Object.values(markers).forEach(m => { map.removeLayer(m.circle); map.removeLayer(m.label); });
+  markers = {};
+
+  SUBURB_DATA.forEach(d => {
+    const color = getColor(d);
+    const rent = getRent(d);
+    const dimmed = currentView === 'rent' && rent != null && rent > currentBudget;
+
+    const circle = L.circleMarker([d.lat,d.lng], {
+      radius: 13,
+      fillColor: color,
+      fillOpacity: dimmed ? 0.25 : 0.88,
+      color: dimmed ? '#ccc' : '#fff',
+      weight: 1.5,
+      opacity: dimmed ? 0.3 : 0.9,
+    }).addTo(map);
+
+    circle.on('mouseover', function(e) {
+      if (!dimmed) this.setStyle({ fillOpacity: 1, weight: 2.5 });
+      const rent = getRent(d);
+      document.getElementById('tt-name').textContent = d.suburb;
+      document.getElementById('tt-zone').textContent = d.zone === 'inner' ? 'Inner City' : 'Suburban';
+      document.getElementById('tt-rent').textContent = rent ? `$${rent}/wk` : 'No data';
+      document.getElementById('tt-type').textContent = `${currentBed} bed · ${currentDwell}`;
+      document.getElementById('tt-crime').textContent = d.crime_2025 != null ? d.crime_2025.toLocaleString() + ' incidents' : 'No data';
+
+      const mp = e.originalEvent;
+      const rect = mapWrap.getBoundingClientRect();
+      let x = mp.clientX - rect.left + 12;
+      let y = mp.clientY - rect.top - 10;
+      if (x + 200 > rect.width) x -= 210;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+      tooltip.classList.add('visible');
+    });
+    circle.on('mouseout', function() {
+      this.setStyle({ fillOpacity: dimmed ? 0.25 : 0.88, weight: dimmed ? 0 : 1.5 });
+      tooltip.classList.remove('visible');
+    });
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="font-size:8.5px;font-weight:600;color:#0F1C18;text-shadow:0 0 3px #fff,0 0 5px #fff;white-space:nowrap;text-align:center;pointer-events:none;opacity:${dimmed?0.3:1}">${d.suburb}</div>`,
+      iconAnchor: [0,-15]
+    });
+    const label = L.marker([d.lat,d.lng], { icon, interactive: false }).addTo(map);
+    markers[d.suburb] = { circle, label, data: d };
+  });
+}
+
+// ── LEADERBOARD ──
+function updateLeaderboard() {
+  const lbEl = document.getElementById('leaderboard');
+  const subEl = document.getElementById('lb-sub');
+  const titleEl = document.getElementById('lb-title');
+
+  subEl.textContent = `${currentBed} bed · ${currentDwell}`;
+
+  let sorted;
+  if (currentView === 'rent') {
+    titleEl.textContent = 'Most affordable';
+    sorted = SUBURB_DATA
+      .map(d => ({ ...d, val: getRent(d) }))
+      .filter(d => d.val != null)
+      .sort((a,b) => a.val - b.val)
+      .slice(0,10);
+  } else {
+    titleEl.textContent = 'Safest suburbs';
+    sorted = SUBURB_DATA
+      .filter(d => d.crime_2025 != null)
+      .sort((a,b) => a.crime_2025 - b.crime_2025)
+      .slice(0,10);
+  }
+
+  lbEl.innerHTML = sorted.map((d,i) => {
+    const color = getColor(d);
+    const val = currentView === 'rent'
+      ? `$${d.val}/wk`
+      : d.crime_2025.toLocaleString();
+    return `
+      <div class="lb-item" onclick="focusSuburb('${d.suburb}')">
+        <span class="lb-rank">${i+1}</span>
+        <span class="lb-dot" style="background:${color}"></span>
+        <span class="lb-name">${d.suburb}</span>
+        <span class="lb-val${currentView==='safety'?' crime':''}">${val}</span>
+      </div>`;
+  }).join('');
+}
+
+function updateKPI() {
+  const rents = SUBURB_DATA.map(d=>getRent(d)).filter(v=>v!=null);
+  const median = rents.sort((a,b)=>a-b)[Math.floor(rents.length/2)];
+  document.getElementById('kpi-median').textContent = `$${median}`;
+  document.getElementById('kpi-median-sub').textContent = `${currentBed} bed · ${currentDwell}`;
+
+  const cheapest = SUBURB_DATA
+    .map(d=>({...d,r:getRent(d)})).filter(d=>d.r!=null).sort((a,b)=>a.r-b.r)[0];
+  if (cheapest) {
+    document.getElementById('kpi-cheap').textContent = cheapest.suburb;
+    document.getElementById('kpi-cheap-sub').textContent = `$${cheapest.r}/wk`;
+  }
+}
+
+function updateLegend() {
+  const titleEl = document.getElementById('legend-title');
+  const scaleEl = document.getElementById('legend-scale');
+  const minEl = document.getElementById('legend-min');
+  const maxEl = document.getElementById('legend-max');
+  if (currentView === 'rent') {
+    titleEl.textContent = `Weekly rent · ${currentBed} bed`;
+    scaleEl.style.background = 'linear-gradient(to right,#085041,#1D9E75,#9FE1CB,#EF9F27,#E24B4A)';
+    minEl.textContent = '$400'; maxEl.textContent = '$1,100+';
+  } else {
+    titleEl.textContent = 'Crime incidents 2025';
+    scaleEl.style.background = 'linear-gradient(to right,#1D9E75,#9FE1CB,#EF9F27,#E24B4A,#961414)';
+    minEl.textContent = 'Low'; maxEl.textContent = 'High';
+  }
+}
+
+function refresh() {
+  buildMarkers();
+  updateLeaderboard();
+  updateKPI();
+  updateLegend();
+}
+
+// ── CONTROLS ──
+function setBed(el) {
+  document.querySelectorAll('#bed-group .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentBed = el.dataset.bed;
+  refresh();
+}
+
+function setDwell(el) {
+  document.querySelectorAll('#dwell-group .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  currentDwell = el.dataset.dwell;
+  refresh();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('btn-rent').classList.toggle('active', v==='rent');
+  document.getElementById('btn-safety').classList.toggle('active', v==='safety');
+  refresh();
+}
+
+function onSlider(el) {
+  currentBudget = +el.value;
+  document.getElementById('slider-display').textContent = `$${currentBudget}`;
+  const pct = ((currentBudget-300)/(1200-300)*100).toFixed(1);
+  el.style.setProperty('--pct', pct+'%');
+  buildMarkers();
+}
+
+function focusSuburb(name) {
+  const m = markers[name];
+  if (!m) return;
+  map.setView([m.data.lat, m.data.lng], 14, { animate: true });
+  m.circle.setStyle({ fillOpacity: 1, weight: 3 });
+}
+
+// ── SEARCH ──
+function onSearch(val) {
+  const clearBtn = document.getElementById('search-clear');
+  const resultsEl = document.getElementById('search-results');
+  clearBtn.style.display = val ? 'block' : 'none';
+
+  if (!val.trim()) {
+    resultsEl.classList.remove('open');
+    return;
+  }
+
+  const q = val.toLowerCase();
+  const matches = SUBURB_DATA.filter(d => d.suburb.toLowerCase().includes(q)).slice(0, 8);
+
+  if (!matches.length) {
+    resultsEl.innerHTML = `<div class="search-no-results">No suburbs found</div>`;
+  } else {
+    resultsEl.innerHTML = matches.map(d => {
+      const rent = getRent(d);
+      const color = getColor(d);
+      const tag = d.zone === 'inner'
+        ? '<span class="sr-tag inner">Inner</span>'
+        : '<span class="sr-tag suburban">Suburban</span>';
+      const meta = rent ? `$${rent}/wk` : (d.crime_2025 ? d.crime_2025.toLocaleString() + ' crimes' : '—');
+      return `
+        <div class="search-result-item" onclick="selectFromSearch('${d.suburb}')">
+          <span class="sr-dot" style="background:${color}"></span>
+          <span class="sr-name">${highlightMatch(d.suburb, val)}</span>
+          ${tag}
+          <span class="sr-meta">${meta}</span>
+        </div>`;
+    }).join('');
+  }
+  resultsEl.classList.add('open');
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0, idx)
+    + `<mark style="background:var(--green-pale);color:var(--green-dark);border-radius:2px;padding:0 1px">${text.slice(idx, idx + query.length)}</mark>`
+    + text.slice(idx + query.length);
+}
+
+function onSearchFocus() {
+  const val = document.getElementById('search-input').value;
+  if (val) onSearch(val);
+}
+
+function selectFromSearch(name) {
+  clearSearch();
+  focusSuburb(name);
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  document.getElementById('search-results').classList.remove('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!document.getElementById('search-wrap').contains(e.target)) {
+    document.getElementById('search-results').classList.remove('open');
+  }
+});
+
+// ── INIT ──
+// Set initial slider gradient
+const sliderEl = document.getElementById('budget-slider');
+sliderEl.style.setProperty('--pct', '31.1%');
+
+refresh();
+</script>
+</body>
+</html>
