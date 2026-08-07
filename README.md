@@ -24,7 +24,8 @@ All frontend files are standalone HTML — open one in a browser, no build step.
 - **Crime** — NZ Police victimisation statistics by suburb, 2025.
 
 The two datasets use different geographic boundaries, so `rent_area_mapping_v2.csv` and
-`crime_area_mapping_v2.csv` map each source area onto a shared set of 62 Auckland suburbs.
+`crime_area_mapping_v2.csv` fold 556 rent source areas and 416 police source areas onto a
+shared set of 63 Auckland suburbs. Coverage: 59/63 have rent figures, 61/63 have crime counts.
 
 ## Running the scraper
 
