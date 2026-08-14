@@ -158,7 +158,9 @@ input[type=range]::-webkit-slider-thumb {
 
 /* ── PANELS ── */
 .panels { flex: 1; display: flex; min-width: 0; }
-.panel { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.panel { min-width: 0; display: flex; flex-direction: column; position: relative; }
+.panel-scatter { flex: 0 0 35%; }
+.panel-map     { flex: 1 1 65%; }
 .panel + .panel { border-left: 1px solid var(--border); }
 .panel-head {
   height: 42px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
@@ -319,9 +321,9 @@ table.rec tbody tr:hover { background: var(--bg); }
       <div class="sidebar-section">
         <div class="filter-label">Dwelling Type</div>
         <div class="pill-row" id="dwell-group">
-          <div class="pill" data-dwell="All" onclick="setDwell(this)">All</div>
+          <div class="pill active" data-dwell="All" onclick="setDwell(this)">All</div>
           <div class="pill" data-dwell="House" onclick="setDwell(this)">House</div>
-          <div class="pill active" data-dwell="Apartment" onclick="setDwell(this)">Apartment</div>
+          <div class="pill" data-dwell="Apartment" onclick="setDwell(this)">Apartment</div>
         </div>
       </div>
 
@@ -344,7 +346,7 @@ table.rec tbody tr:hover { background: var(--bg); }
     <div class="panels">
 
       <!-- SCATTER -->
-      <div class="panel">
+      <div class="panel panel-scatter">
         <div class="panel-head">
           <span class="panel-title">Rent vs Safety</span>
           <span class="panel-sub" id="scatter-sub"></span>
@@ -360,7 +362,7 @@ table.rec tbody tr:hover { background: var(--bg); }
       </div>
 
       <!-- MAP -->
-      <div class="panel">
+      <div class="panel panel-map">
         <div class="panel-head">
           <span class="panel-title">Map</span>
           <span class="panel-sub" id="map-sub"></span>
@@ -427,7 +429,7 @@ const SUBURB_DATA = [{"suburb":"Auckland Central","lat":-36.8485,"lng":174.7633,
 
 // ── STATE ──
 let currentBed   = '2';
-let currentDwell = 'Apartment';
+let currentDwell = 'All';
 let currentBudget = 650;
 let mapMode = 'quadrant';           // 'quadrant' | 'rent' | 'safety'
 let sortKey = 'score', sortDir = -1;
@@ -649,8 +651,11 @@ function drawScatter() {
     if (w > 0 && h > 0) svg.appendChild(el('rect', { x, y, width:w, height:h, fill:c, opacity:0.045 }));
   });
 
-  // Grid + X ticks
-  const step = (rHi - rLo) > 500 ? 200 : 100;
+  // Grid + X ticks. Narrow panels get fewer ticks so labels don't collide.
+  const plotW = x1 - x0;
+  const targetTicks = Math.max(3, Math.floor(plotW / 78));
+  const rawStep = (rHi - rLo) / targetTicks;
+  const step = [50,100,150,200,250,500].find(s => s >= rawStep) || 500;
   for (let v = rLo; v <= rHi; v += step) {
     svg.appendChild(el('line', { x1:sx(v), y1:y0, x2:sx(v), y2:y1, class:'sc-grid' }));
     svg.appendChild(el('text', { x:sx(v), y:y1+15, 'text-anchor':'middle', class:'sc-tick' }, '$'+v));
@@ -665,12 +670,13 @@ function drawScatter() {
   svg.appendChild(el('line', { x1:mx, y1:y0, x2:mx, y2:y1, class:'sc-median' }));
   svg.appendChild(el('line', { x1:x0, y1:my, x2:x1, y2:my, class:'sc-median' }));
 
-  // Quadrant corner labels
+  // Quadrant corner labels — abbreviated once the panel is too narrow to fit them
+  const terse = plotW < 400;
   const corners = [
-    [x0+7,  y0+13, 'start', QUAD.best.color,    'BEST VALUE'],
-    [x1-7,  y0+13, 'end',   QUAD.premium.color, 'PREMIUM'],
+    [x0+7,  y0+13, 'start', QUAD.best.color,    terse ? 'BEST' : 'BEST VALUE'],
+    [x1-7,  y0+13, 'end',   QUAD.premium.color, terse ? 'PREMIUM' : 'PREMIUM'],
     [x0+7,  y1-7,  'start', QUAD.budget.color,  'BUDGET'],
-    [x1-7,  y1-7,  'end',   QUAD.avoid.color,   'NOT RECOMMENDED'],
+    [x1-7,  y1-7,  'end',   QUAD.avoid.color,   terse ? 'AVOID' : 'NOT RECOMMENDED'],
   ];
   corners.forEach(([x,y,anchor,fill,txt]) =>
     svg.appendChild(el('text', { x, y, 'text-anchor':anchor, fill, class:'sc-qlabel' }, txt)));
