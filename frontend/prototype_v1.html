@@ -138,6 +138,15 @@ nav {
 .pill.disabled { opacity: 0.35; pointer-events: none; }
 .bed-note { font-size: 10.5px; color: var(--faint); margin-top: 8px; font-style: italic; }
 
+/* Granularity slider */
+#gran-slider { margin-bottom: 7px; }
+.gran-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+.gran-labels span { display: flex; flex-direction: column; line-height: 1.35; }
+.gran-labels span:last-child { text-align: right; }
+.gran-labels b { font-size: 10px; font-weight: 700; color: var(--faint); }
+.gran-labels span.on { color: var(--green-dark); font-weight: 600; }
+.gran-labels span.on b { color: var(--green); }
+
 .slider-value { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .slider-current { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .slider-range { font-size: 11px; color: var(--muted); }
@@ -303,6 +312,16 @@ input[type=range]::-webkit-slider-thumb {
         </div>
       </div>
 
+      <div class="sidebar-section" id="gran-section">
+        <div class="filter-label">Granularity</div>
+        <input type="range" id="gran-slider" min="0" max="1" step="1" value="0"
+               oninput="setGranularity(+this.value ? 'suburb' : 'ward')">
+        <div class="gran-labels">
+          <span id="gran-ward">Wards<b>11</b></span>
+          <span id="gran-suburb">Suburbs<b>62</b></span>
+        </div>
+      </div>
+
       <div class="sidebar-section">
         <div class="filter-label">Bedrooms</div>
         <div class="pill-row" id="bed-group">
@@ -429,7 +448,68 @@ input[type=range]::-webkit-slider-thumb {
 // ── DATA ──
 const SUBURB_DATA = [{"suburb":"Auckland Central","lat":-36.8485,"lng":174.7633,"zone":"inner","crime_2025":4914,"rent":{"House":{"1":580,"2":647,"3":740,"4":1500,"All":755},"Apartment":{"1":491,"2":641,"3":843,"4":302,"All":577},"Flat":{"1":537,"2":476,"3":405},"Room":{"1":268,"All":292},"Boarding House":{"1":230}},"n":{"House":{"1":960,"2":138,"3":123,"4":48,"All":375},"Apartment":{"1":2202,"2":1947,"3":258,"4":15,"All":93},"Flat":{"1":81,"2":60,"3":3},"Room":{"1":246,"All":9},"Boarding House":{"1":9}}},{"suburb":"Grafton","lat":-36.863,"lng":174.77,"zone":"inner","crime_2025":342,"rent":{"House":{"1":295,"3":785,"All":295},"Apartment":{"1":495,"2":650},"Flat":{"1":460,"2":630},"Room":{},"Boarding House":{}},"n":{"House":{"1":141,"3":45,"All":75},"Apartment":{"1":87,"2":24},"Flat":{"1":48,"2":24},"Room":{},"Boarding House":{}}},{"suburb":"Parnell","lat":-36.855,"lng":174.78,"zone":"inner","crime_2025":248,"rent":{"House":{"1":864,"2":795,"3":945,"4":1200,"All":580},"Apartment":{"1":530,"2":712,"3":925},"Flat":{"1":492,"2":610},"Room":{"1":260},"Boarding House":{"1":230}},"n":{"House":{"1":105,"2":90,"3":177,"4":69,"All":33},"Apartment":{"1":180,"2":210,"3":81},"Flat":{"1":96,"2":72},"Room":{"1":21},"Boarding House":{"1":9}}},{"suburb":"Newmarket","lat":-36.871,"lng":174.776,"zone":"inner","crime_2025":1198,"rent":{"House":{"1":600,"2":650,"3":940,"4":1225,"All":638},"Apartment":{"1":500,"2":643,"3":800},"Flat":{"1":465,"2":620},"Room":{},"Boarding House":{"1":313}},"n":{"House":{"1":81,"2":27,"3":60,"4":30,"All":75},"Apartment":{"1":129,"2":150,"3":102},"Flat":{"1":36,"2":30},"Room":{},"Boarding House":{"1":0}}},{"suburb":"Remuera","lat":-36.88,"lng":174.795,"zone":"inner","crime_2025":528,"rent":{"House":{"1":890,"2":698,"3":889,"4":1142,"All":896},"Apartment":{"1":533,"2":635,"3":1800},"Flat":{"1":396,"2":631},"Room":{},"Boarding House":{}},"n":{"House":{"1":264,"2":204,"3":606,"4":354,"All":117},"Apartment":{"1":6,"2":111,"3":12},"Flat":{"1":69,"2":111},"Room":{},"Boarding House":{}}},{"suburb":"Epsom","lat":-36.894,"lng":174.77,"zone":"inner","crime_2025":450,"rent":{"House":{"1":825,"2":678,"3":875,"4":1090,"All":918},"Apartment":{"1":572,"2":718,"3":778},"Flat":{"1":474,"2":612,"3":680},"Room":{},"Boarding House":{"1":258}},"n":{"House":{"1":156,"2":183,"3":300,"4":213,"All":135},"Apartment":{"1":39,"2":126,"3":30},"Flat":{"1":78,"2":297,"3":21},"Room":{},"Boarding House":{"1":60}}},{"suburb":"Mt Eden","lat":-36.883,"lng":174.753,"zone":"inner","crime_2025":510,"rent":{"House":{"1":646,"2":666,"3":811,"4":1081,"All":847},"Apartment":{"1":489,"2":628,"3":1260,"All":660},"Flat":{"1":460,"2":571},"Room":{"1":245},"Boarding House":{}},"n":{"House":{"1":207,"2":165,"3":240,"4":165,"All":111},"Apartment":{"1":243,"2":243,"3":24,"All":6},"Flat":{"1":327,"2":300},"Room":{"1":15},"Boarding House":{}}},{"suburb":"Kingsland","lat":-36.872,"lng":174.744,"zone":"inner","crime_2025":184,"rent":{"House":{"1":750,"2":750,"3":823,"4":888},"Apartment":{"1":500,"2":670},"Flat":{"1":450,"2":560},"Room":{},"Boarding House":{"All":330}},"n":{"House":{"1":48,"2":48,"3":102,"4":54},"Apartment":{"1":21,"2":120},"Flat":{"1":27,"2":30},"Room":{},"Boarding House":{"All":24}}},{"suburb":"Sandringham","lat":-36.888,"lng":174.743,"zone":"inner","crime_2025":1664,"rent":{"House":{"1":576,"2":587,"3":748,"4":946,"All":555},"Apartment":{"2":556},"Flat":{"1":433,"2":546},"Room":{},"Boarding House":{}},"n":{"House":{"1":156,"2":189,"3":330,"4":156,"All":27},"Apartment":{"2":135},"Flat":{"1":90,"2":285},"Room":{},"Boarding House":{}}},{"suburb":"Grey Lynn","lat":-36.864,"lng":174.742,"zone":"inner","crime_2025":1195,"rent":{"House":{"1":651,"2":778,"3":876,"4":1008,"All":766},"Apartment":{"1":582,"2":749,"3":1249},"Flat":{"1":483,"2":563},"Room":{"All":355},"Boarding House":{"1":300}},"n":{"House":{"1":198,"2":162,"3":306,"4":129,"All":117},"Apartment":{"1":198,"2":174,"3":21},"Flat":{"1":138,"2":27},"Room":{"All":30},"Boarding House":{"1":21}}},{"suburb":"Ponsonby","lat":-36.856,"lng":174.744,"zone":"inner","crime_2025":566,"rent":{"House":{"1":804,"2":791,"3":1011,"4":1292,"All":1300},"Apartment":{"1":563,"2":692,"3":850},"Flat":{"1":529,"2":675},"Room":{},"Boarding House":{}},"n":{"House":{"1":144,"2":84,"3":258,"4":96,"All":27},"Apartment":{"1":162,"2":72,"3":15},"Flat":{"1":117,"2":75},"Room":{},"Boarding House":{}}},{"suburb":"Eden Terrace","lat":-36.867,"lng":174.752,"zone":"inner","crime_2025":101,"rent":{"House":{"1":563,"2":700,"4":324,"All":650},"Apartment":{"1":515,"2":650,"3":830,"All":658},"Flat":{"1":458,"2":600,"3":250},"Room":{"1":260},"Boarding House":{"1":350,"All":340}},"n":{"House":{"1":186,"2":99,"4":12,"All":96},"Apartment":{"1":360,"2":411,"3":39,"All":48},"Flat":{"1":39,"2":33,"3":18},"Room":{"1":18},"Boarding House":{"1":18,"All":9}}},{"suburb":"Balmoral","lat":-36.894,"lng":174.755,"zone":"inner","crime_2025":300,"rent":{"House":{"1":600,"2":650,"3":800,"4":960,"All":910},"Apartment":{"1":490,"2":595},"Flat":{"1":530,"2":580},"Room":{},"Boarding House":{}},"n":{"House":{"1":39,"2":33,"3":66,"4":39,"All":18},"Apartment":{"1":9,"2":30},"Flat":{"1":75,"2":45},"Room":{},"Boarding House":{}}},{"suburb":"Mt Albert","lat":-36.889,"lng":174.728,"zone":"inner","crime_2025":343,"rent":{"House":{"1":661,"2":642,"3":788,"4":917,"All":738},"Apartment":{"1":480,"2":546,"All":610},"Flat":{"1":448,"2":542},"Room":{},"Boarding House":{"1":288,"All":150}},"n":{"House":{"1":141,"2":162,"3":237,"4":81,"All":87},"Apartment":{"1":15,"2":54,"All":48},"Flat":{"1":60,"2":237},"Room":{},"Boarding House":{"1":36,"All":9}}},{"suburb":"Avondale","lat":-36.901,"lng":174.714,"zone":"inner","crime_2025":327,"rent":{"House":{"1":653,"2":599,"3":675,"4":800,"All":671},"Apartment":{"1":505,"2":550},"Flat":{"1":508,"2":500},"Room":{"1":425,"All":368},"Boarding House":{}},"n":{"House":{"1":225,"2":312,"3":771,"4":240,"All":276},"Apartment":{"1":60,"2":72},"Flat":{"1":57,"2":63},"Room":{"1":24,"All":21},"Boarding House":{}}},{"suburb":"New Lynn","lat":-36.908,"lng":174.686,"zone":"inner","crime_2025":1279,"rent":{"House":{"1":594,"2":575,"3":658,"4":745,"All":584},"Apartment":{"1":422,"2":552},"Flat":{"1":415,"2":538},"Room":{},"Boarding House":{"All":340}},"n":{"House":{"1":282,"2":381,"3":729,"4":141,"All":213},"Apartment":{"1":93,"2":75},"Flat":{"1":48,"2":141},"Room":{},"Boarding House":{"All":3}}},{"suburb":"Onehunga","lat":-36.926,"lng":174.784,"zone":"inner","crime_2025":888,"rent":{"House":{"1":624,"2":598,"3":758,"4":815,"All":736},"Apartment":{"1":470,"2":602,"All":675},"Flat":{"1":450,"2":547},"Room":{"1":400},"Boarding House":{}},"n":{"House":{"1":210,"2":267,"3":318,"4":72,"All":177},"Apartment":{"1":72,"2":174,"All":9},"Flat":{"1":33,"2":213},"Room":{"1":21},"Boarding House":{}}},{"suburb":"Penrose","lat":-36.919,"lng":174.8,"zone":"inner","crime_2025":2852,"rent":{"House":{"2":558,"4":825},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"2":12,"4":9},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Otahuhu","lat":-36.952,"lng":174.831,"zone":"inner","crime_2025":730,"rent":{"House":{"1":483,"2":530,"3":671,"4":619,"All":600},"Apartment":{"1":353,"2":487},"Flat":{"1":413,"2":464},"Room":{"1":400},"Boarding House":{"1":315}},"n":{"House":{"1":288,"2":219,"3":378,"4":105,"All":141},"Apartment":{"1":102,"2":99},"Flat":{"1":237,"2":339},"Room":{"1":66},"Boarding House":{"1":99}}},{"suburb":"Glen Innes","lat":-36.885,"lng":174.853,"zone":"inner","crime_2025":1139,"rent":{"House":{"1":748,"2":404,"3":705,"4":785,"All":638},"Apartment":{"1":550,"2":630},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":84,"2":333,"3":621,"4":207,"All":129},"Apartment":{"1":18,"2":30},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Panmure","lat":-36.899,"lng":174.849,"zone":"inner","crime_2025":643,"rent":{"House":{"1":592,"2":580,"3":690,"4":795,"All":720},"Apartment":{"1":448,"2":602},"Flat":{"2":568},"Room":{},"Boarding House":{}},"n":{"House":{"1":237,"2":117,"3":177,"4":48,"All":42},"Apartment":{"1":12,"2":54},"Flat":{"2":96},"Room":{},"Boarding House":{}}},{"suburb":"Ellerslie","lat":-36.906,"lng":174.818,"zone":"inner","crime_2025":350,"rent":{"House":{"1":621,"2":685,"3":767,"4":897,"All":659},"Apartment":{"1":550,"2":590,"All":520},"Flat":{"1":469,"2":558},"Room":{},"Boarding House":{}},"n":{"House":{"1":183,"2":210,"3":351,"4":102,"All":93},"Apartment":{"1":39,"2":75,"All":18},"Flat":{"1":33,"2":207},"Room":{},"Boarding House":{}}},{"suburb":"Greenlane","lat":-36.895,"lng":174.787,"zone":"inner","crime_2025":525,"rent":{"House":{"1":852,"2":642,"3":795,"4":1080,"All":995},"Apartment":{"2":562},"Flat":{"2":580},"Room":{},"Boarding House":{}},"n":{"House":{"1":90,"2":102,"3":243,"4":123,"All":69},"Apartment":{"2":39},"Flat":{"2":75},"Room":{},"Boarding House":{}}},{"suburb":"Royal Oak","lat":-36.914,"lng":174.778,"zone":"inner","crime_2025":353,"rent":{"House":{"1":680,"2":599,"3":735,"4":900,"All":770},"Apartment":{"2":615},"Flat":{"2":580},"Room":{"1":380,"All":400},"Boarding House":{}},"n":{"House":{"1":72,"2":90,"3":144,"4":90,"All":39},"Apartment":{"2":39},"Flat":{"2":132},"Room":{"1":6,"All":9},"Boarding House":{}}},{"suburb":"Three Kings","lat":-36.908,"lng":174.762,"zone":"inner","crime_2025":940,"rent":{"House":{"1":764,"2":650,"3":769,"4":1040,"All":750},"Apartment":{"2":650},"Flat":{},"Room":{"1":350},"Boarding House":{"1":265}},"n":{"House":{"1":27,"2":57,"3":99,"4":39,"All":18},"Apartment":{"2":15},"Flat":{},"Room":{"1":24},"Boarding House":{"1":3}}},{"suburb":"Mt Roskill","lat":-36.917,"lng":174.745,"zone":"inner","crime_2025":403,"rent":{"House":{"1":705,"2":612,"3":728,"4":847,"All":725},"Apartment":{"1":510,"2":630},"Flat":{"1":520,"2":536},"Room":{},"Boarding House":{}},"n":{"House":{"1":72,"2":93,"3":387,"4":177,"All":24},"Apartment":{"1":18,"2":12},"Flat":{"1":27,"2":45},"Room":{},"Boarding House":{}}},{"suburb":"Hillsborough","lat":-36.924,"lng":174.761,"zone":"inner","crime_2025":953,"rent":{"House":{"1":704,"2":646,"3":713,"4":856,"All":759},"Apartment":{"2":560},"Flat":{"1":428,"2":570},"Room":{},"Boarding House":{}},"n":{"House":{"1":105,"2":135,"3":354,"4":192,"All":36},"Apartment":{"2":6},"Flat":{"1":33,"2":21},"Room":{},"Boarding House":{}}},{"suburb":"Blockhouse Bay","lat":-36.931,"lng":174.711,"zone":"inner","crime_2025":595,"rent":{"House":{"1":646,"2":631,"3":708,"4":803,"All":768},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":141,"2":114,"3":471,"4":183,"All":108},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Point Chevalier","lat":-36.871,"lng":174.716,"zone":"inner","crime_2025":854,"rent":{"House":{"1":878,"2":665,"3":872,"4":1125,"All":839},"Apartment":{"1":407},"Flat":{"1":475,"2":620},"Room":{"1":350},"Boarding House":{}},"n":{"House":{"1":42,"2":93,"3":213,"4":78,"All":36},"Apartment":{"1":15},"Flat":{"1":42,"2":18},"Room":{"1":12},"Boarding House":{}}},{"suburb":"Waterview","lat":-36.887,"lng":174.721,"zone":"inner","crime_2025":102,"rent":{"House":{"1":655,"2":650,"3":703,"4":890,"All":630},"Apartment":{"2":588,"All":540},"Flat":{"2":540},"Room":{"1":390},"Boarding House":{}},"n":{"House":{"1":48,"2":57,"3":108,"4":45,"All":36},"Apartment":{"2":18,"All":21},"Flat":{"2":30},"Room":{"1":6},"Boarding House":{}}},{"suburb":"St Lukes","lat":-36.879,"lng":174.738,"zone":"inner","crime_2025":420,"rent":{"House":{"1":630,"2":620,"3":760,"4":923},"Apartment":{"1":500,"2":660,"3":690},"Flat":{"1":490,"2":555},"Room":{},"Boarding House":{}},"n":{"House":{"1":33,"2":27,"3":63,"4":21},"Apartment":{"1":18,"2":99,"3":60},"Flat":{"1":18,"2":42},"Room":{},"Boarding House":{}}},{"suburb":"Meadowbank","lat":-36.872,"lng":174.825,"zone":"inner","crime_2025":151,"rent":{"House":{"1":668,"2":648,"3":778,"4":1200},"Apartment":{"2":578},"Flat":{"1":488,"2":550},"Room":{},"Boarding House":{}},"n":{"House":{"1":57,"2":51,"3":114,"4":45},"Apartment":{"2":30},"Flat":{"1":39,"2":99},"Room":{},"Boarding House":{}}},{"suburb":"St Heliers","lat":-36.86,"lng":174.859,"zone":"inner","crime_2025":204,"rent":{"House":{"1":923,"2":708,"3":858,"4":1102,"All":1023},"Apartment":{"1":546,"2":720,"3":925,"All":748},"Flat":{"2":626},"Room":{},"Boarding House":{}},"n":{"House":{"1":57,"2":105,"3":222,"4":147,"All":69},"Apartment":{"1":15,"2":78,"3":12,"All":3},"Flat":{"2":105},"Room":{},"Boarding House":{}}},{"suburb":"Mission Bay","lat":-36.858,"lng":174.842,"zone":"inner","crime_2025":167,"rent":{"House":{"1":640,"2":700,"3":935,"4":1100,"All":1040},"Apartment":{"1":513,"2":798,"3":810},"Flat":{"1":450,"2":713},"Room":{},"Boarding House":{}},"n":{"House":{"1":78,"2":72,"3":108,"4":60,"All":45},"Apartment":{"1":39,"2":87,"3":12},"Flat":{"1":33,"2":69},"Room":{},"Boarding House":{}}},{"suburb":"Kohimarama","lat":-36.86,"lng":174.848,"zone":"inner","crime_2025":41,"rent":{"House":{"1":700,"2":600,"3":900,"4":1200,"All":793},"Apartment":{"1":510,"2":790},"Flat":{"1":455,"2":660},"Room":{},"Boarding House":{}},"n":{"House":{"1":30,"2":48,"3":75,"4":72,"All":27},"Apartment":{"1":15,"2":42},"Flat":{"1":24,"2":48},"Room":{},"Boarding House":{}}},{"suburb":"Glendowie","lat":-36.864,"lng":174.868,"zone":"inner","crime_2025":25,"rent":{"House":{"1":1015,"2":673,"3":860,"4":1030,"All":979},"Apartment":{"2":550},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":30,"2":24,"3":192,"4":96,"All":36},"Apartment":{"2":9},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Henderson","lat":-36.875,"lng":174.632,"zone":"suburban","crime_2025":4348,"rent":{"House":{"1":591,"2":565,"3":641,"4":764,"All":583},"Apartment":{"1":488,"2":428,"All":490},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":345,"2":363,"3":1080,"4":282,"All":348},"Apartment":{"1":21,"2":30,"All":6},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Massey","lat":-36.845,"lng":174.627,"zone":"suburban","crime_2025":780,"rent":{"House":{"1":610,"2":577,"3":672,"4":737,"All":626},"Apartment":{},"Flat":{"2":508},"Room":{"1":380},"Boarding House":{}},"n":{"House":{"1":291,"2":264,"3":993,"4":285,"All":231},"Apartment":{},"Flat":{"2":48},"Room":{"1":36},"Boarding House":{}}},{"suburb":"West Harbour","lat":-36.818,"lng":174.637,"zone":"suburban","crime_2025":141,"rent":{"House":{"1":778,"2":608,"3":721,"4":838,"All":762},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":102,"2":57,"3":408,"4":183,"All":57},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Hobsonville","lat":-36.794,"lng":174.657,"zone":"suburban","crime_2025":1172,"rent":{"House":{"1":724,"2":650,"3":765,"4":856,"All":746},"Apartment":{"1":583,"2":630},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":258,"2":108,"3":195,"4":135,"All":300},"Apartment":{"1":42,"2":78},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Waitakere","lat":-36.892,"lng":174.571,"zone":"suburban","crime_2025":88,"rent":{"House":{"1":320},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":18},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Titirangi","lat":-36.939,"lng":174.654,"zone":"suburban","crime_2025":112,"rent":{"House":{"1":743,"2":625,"3":700,"4":845},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":12,"2":21,"3":39,"4":30},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Albany","lat":-36.728,"lng":174.7,"zone":"suburban","crime_2025":3574,"rent":{"House":{"1":763,"2":573,"3":747,"4":898,"All":739},"Apartment":{"1":580,"2":614,"3":865,"All":450},"Flat":{},"Room":{"1":485,"All":245},"Boarding House":{}},"n":{"House":{"1":156,"2":54,"3":231,"4":231,"All":147},"Apartment":{"1":84,"2":132,"3":21,"All":6},"Flat":{},"Room":{"1":12,"All":33},"Boarding House":{}}},{"suburb":"Takapuna","lat":-36.787,"lng":174.77,"zone":"suburban","crime_2025":834,"rent":{"House":{"1":760,"2":633,"3":1225,"4":1173,"All":885},"Apartment":{"1":595,"2":768,"3":793},"Flat":{"2":716},"Room":{"1":605},"Boarding House":{}},"n":{"House":{"1":105,"2":171,"3":162,"4":120,"All":75},"Apartment":{"1":117,"2":192,"3":18},"Flat":{"2":150},"Room":{"1":12},"Boarding House":{}}},{"suburb":"Milford","lat":-36.776,"lng":174.758,"zone":"suburban","crime_2025":164,"rent":{"House":{"1":865,"2":778,"3":940,"4":1375,"All":976},"Apartment":{"2":660},"Flat":{"2":610},"Room":{},"Boarding House":{}},"n":{"House":{"1":54,"2":105,"3":138,"4":75,"All":36},"Apartment":{"2":24},"Flat":{"2":108},"Room":{},"Boarding House":{}}},{"suburb":"Devonport","lat":-36.829,"lng":174.796,"zone":"suburban","crime_2025":90,"rent":{"House":{"1":800,"2":795,"3":885,"4":1200},"Apartment":{"2":690},"Flat":{"1":460,"2":650},"Room":{},"Boarding House":{}},"n":{"House":{"1":36,"2":30,"3":51,"4":30},"Apartment":{"2":33},"Flat":{"1":30,"2":48},"Room":{},"Boarding House":{}}},{"suburb":"Northcote","lat":-36.812,"lng":174.747,"zone":"suburban","crime_2025":234,"rent":{"House":{"1":722,"2":624,"3":740,"4":945,"All":730},"Apartment":{"1":595,"2":635,"3":700},"Flat":{"2":575},"Room":{},"Boarding House":{}},"n":{"House":{"1":105,"2":129,"3":258,"4":141,"All":78},"Apartment":{"1":15,"2":33,"3":9},"Flat":{"2":69},"Room":{},"Boarding House":{}}},{"suburb":"Glenfield","lat":-36.782,"lng":174.723,"zone":"suburban","crime_2025":1446,"rent":{"House":{"1":674,"2":604,"3":700,"4":818,"All":688},"Apartment":{"1":475,"2":572},"Flat":{"1":410,"2":493},"Room":{},"Boarding House":{}},"n":{"House":{"1":129,"2":276,"3":711,"4":234,"All":69},"Apartment":{"1":3,"2":15},"Flat":{"1":30,"2":99},"Room":{},"Boarding House":{}}},{"suburb":"Browns Bay","lat":-36.724,"lng":174.743,"zone":"suburban","crime_2025":513,"rent":{"House":{"1":733,"2":617,"3":768,"4":888,"All":815},"Apartment":{"2":660,"3":848},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":90,"2":123,"3":276,"4":174,"All":51},"Apartment":{"2":60,"3":9},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Birkenhead","lat":-36.819,"lng":174.73,"zone":"suburban","crime_2025":166,"rent":{"House":{"1":693,"2":637,"3":793,"4":962,"All":715},"Apartment":{"1":515,"2":615},"Flat":{"1":488,"2":602},"Room":{},"Boarding House":{"All":250}},"n":{"House":{"1":105,"2":129,"3":252,"4":123,"All":66},"Apartment":{"1":18,"2":63},"Flat":{"1":27,"2":45},"Room":{},"Boarding House":{"All":6}}},{"suburb":"Beachhaven","lat":-36.808,"lng":174.713,"zone":"suburban","crime_2025":180,"rent":{"House":{"1":645,"2":618,"3":695,"4":750,"All":682},"Apartment":{},"Flat":{"2":498},"Room":{},"Boarding House":{}},"n":{"House":{"1":60,"2":144,"3":294,"4":111,"All":57},"Apartment":{},"Flat":{"2":18},"Room":{},"Boarding House":{}}},{"suburb":"Manukau","lat":-36.993,"lng":174.877,"zone":"suburban","crime_2025":5599,"rent":{"House":{"1":490,"2":610,"All":490},"Apartment":{"1":450,"2":545},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":84,"2":12,"All":99},"Apartment":{"1":135,"2":42},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Papatoetoe","lat":-36.983,"lng":174.852,"zone":"suburban","crime_2025":1822,"rent":{"House":{"1":609,"2":588,"3":695,"4":770,"All":653},"Apartment":{"1":434,"2":544},"Flat":{"1":455,"2":565},"Room":{},"Boarding House":{"1":400}},"n":{"House":{"1":387,"2":390,"3":807,"4":231,"All":357},"Apartment":{"1":60,"2":105},"Flat":{"1":33,"2":336},"Room":{},"Boarding House":{"1":69}}},{"suburb":"Otara","lat":-36.968,"lng":174.873,"zone":"suburban","crime_2025":1190,"rent":{"House":{"1":634,"2":603,"3":673,"4":790,"All":678},"Apartment":{"2":550,"3":645},"Flat":{"2":545},"Room":{},"Boarding House":{}},"n":{"House":{"1":159,"2":105,"3":792,"4":144,"All":90},"Apartment":{"2":9,"3":9},"Flat":{"2":42},"Room":{},"Boarding House":{}}},{"suburb":"Mangere","lat":-36.979,"lng":174.792,"zone":"suburban","crime_2025":2894,"rent":{"House":{"1":620,"2":598,"3":670,"4":778,"All":637},"Apartment":{"1":510,"2":530,"3":650},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":303,"2":126,"3":639,"4":228,"All":354},"Apartment":{"1":42,"2":3,"3":3},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Mangere Bridge","lat":-36.959,"lng":174.786,"zone":"suburban","crime_2025":240,"rent":{"House":{"1":672,"2":654,"3":702,"All":699},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":69,"2":102,"3":153,"All":54},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Botany","lat":-36.932,"lng":174.91,"zone":"suburban","crime_2025":1733,"rent":{"House":{"1":857,"2":605,"3":739,"4":841,"All":815},"Apartment":{},"Flat":{"2":550},"Room":{},"Boarding House":{}},"n":{"House":{"1":87,"2":42,"3":333,"4":237,"All":42},"Apartment":{},"Flat":{"2":9},"Room":{},"Boarding House":{}}},{"suburb":"Howick","lat":-36.902,"lng":174.932,"zone":"suburban","crime_2025":560,"rent":{"House":{"1":650,"2":615,"3":710,"4":815,"All":727},"Apartment":{"2":575,"3":623},"Flat":{"1":395,"2":595},"Room":{},"Boarding House":{}},"n":{"House":{"1":114,"2":192,"3":366,"4":177,"All":117},"Apartment":{"2":39,"3":12},"Flat":{"1":21,"2":42},"Room":{},"Boarding House":{}}},{"suburb":"Pakuranga","lat":-36.904,"lng":174.909,"zone":"suburban","crime_2025":893,"rent":{"House":{"1":686,"2":596,"3":684,"4":785,"All":678},"Apartment":{"2":549},"Flat":{"2":535,"3":475},"Room":{},"Boarding House":{}},"n":{"House":{"1":180,"2":291,"3":840,"4":333,"All":225},"Apartment":{"2":27},"Flat":{"2":93,"3":6},"Room":{},"Boarding House":{}}},{"suburb":"Flat Bush","lat":-36.963,"lng":174.913,"zone":"suburban","crime_2025":null,"rent":{"House":{"1":749,"2":562,"3":705,"4":827,"All":823},"Apartment":{"2":590},"Flat":{"2":522},"Room":{"1":498,"All":240},"Boarding House":{"1":550,"All":445}},"n":{"House":{"1":138,"2":99,"3":93,"4":150,"All":225},"Apartment":{"2":33},"Flat":{"2":90},"Room":{"1":6,"All":9},"Boarding House":{"1":12,"All":6}}},{"suburb":"Dannemora","lat":-36.935,"lng":174.92,"zone":"suburban","crime_2025":629,"rent":{"House":{"1":870,"3":780,"4":842,"All":910},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}},"n":{"House":{"1":24,"3":24,"4":186,"All":12},"Apartment":{},"Flat":{},"Room":{},"Boarding House":{}}},{"suburb":"Beachlands","lat":-36.902,"lng":175.001,"zone":"suburban","crime_2025":84,"rent":{"House":{"1":662,"2":590,"3":730,"4":862},"Apartment":{},"Flat":{"1":365},"Room":{},"Boarding House":{}},"n":{"House":{"1":36,"2":96,"3":108,"4":81},"Apartment":{},"Flat":{"1":6},"Room":{},"Boarding House":{}}}];
 
+// ── WARDS ──
+// The 13 real Auckland wards, named as MBIE's ward-2019 area definition reports
+// them. Not to be confused with the 21 local boards, which have different names
+// and different boundaries.
+const WARD_SUBURBS = {
+  'Waitemata and Gulf': ['Auckland Central','Ponsonby','Grey Lynn','Eden Terrace','Grafton','Newmarket','Parnell'],
+  'Albert-Eden-Roskill': ['Mt Eden','Kingsland','Balmoral','Sandringham','Epsom','Mt Albert','St Lukes',
+                          'Point Chevalier','Waterview','Mt Roskill','Three Kings','Hillsborough'],
+  'Orakei': ['Remuera','Meadowbank','St Heliers','Mission Bay','Kohimarama','Glendowie','Greenlane'],
+  'Maungakiekie-Tamaki': ['Onehunga','Penrose','Panmure','Glen Innes','Royal Oak','Ellerslie'],
+  'Whau': ['Avondale','New Lynn','Blockhouse Bay'],
+  'Waitakere': ['Henderson','Massey','Titirangi','Waitakere'],
+  'Albany': ['Albany','Hobsonville','West Harbour','Browns Bay'],
+  'North Shore': ['Devonport','Takapuna','Milford','Northcote','Birkenhead','Beachhaven','Glenfield'],
+  'Manukau': ['Mangere','Mangere Bridge','Otahuhu','Papatoetoe','Otara','Manukau'],
+  'Howick': ['Botany','Howick','Pakuranga','Flat Bush','Dannemora'],
+  'Franklin': ['Beachlands'],
+};
+
+const ALL_DWELLS = ['House','Apartment','Flat','Room','Boarding House'];
+const ALL_BEDS = ['1','2','3','4','All'];
+
+// Ward rent is an nCurr-weighted mean of its suburbs' medians; ward crime is a
+// plain sum. Both are scoped to the 62 suburbs we cover, so the two metrics
+// describe the same footprint — a ward is not the full council ward.
+function buildWards() {
+  const byName = Object.fromEntries(SUBURB_DATA.map(d => [d.suburb, d]));
+  return Object.entries(WARD_SUBURBS).map(([name, members]) => {
+    const subs = members.map(m => byName[m]).filter(Boolean);
+    const rent = {}, n = {};
+    ALL_DWELLS.forEach(dw => {
+      rent[dw] = {}; n[dw] = {};
+      ALL_BEDS.forEach(b => {
+        let num = 0, den = 0;
+        subs.forEach(s => {
+          const v = (s.rent[dw]||{})[b], w = (s.n[dw]||{})[b] || 0;
+          if (v && w > 0) { num += v * w; den += w; }
+        });
+        if (den > 0) { rent[dw][b] = Math.round(num/den); n[dw][b] = den; }
+      });
+    });
+    const withCrime = subs.filter(s => s.crime_2025 != null);
+    const inner = subs.filter(s => s.zone === 'inner').length;
+    return {
+      suburb: name,
+      lat: subs.reduce((a,s)=>a+s.lat,0)/subs.length,
+      lng: subs.reduce((a,s)=>a+s.lng,0)/subs.length,
+      zone: inner > subs.length/2 ? 'inner' : 'suburban',
+      crime_2025: withCrime.length ? withCrime.reduce((a,s)=>a+s.crime_2025,0) : null,
+      rent, n,
+      memberCount: subs.length,
+      missingCrime: subs.length - withCrime.length,
+    };
+  });
+}
+
 // ── STATE ──
+let granularity = 'ward';   // 'ward' | 'suburb'
+let WARD_DATA = [];
+let UNITS = [];             // whatever the current granularity renders
+const units = () => UNITS;
+
 let currentBed   = '2';
 let currentDwell = 'All';
 let currentBudget = 650;
@@ -475,8 +555,8 @@ let medRent = 0, medCrime = 0;
 // window; otherwise a slice spanning $494–$900 renders as one flat shade.
 let rentLo = 0, rentHi = 1;
 function computeMedians() {
-  const rents  = SUBURB_DATA.map(getRent).filter(v => v != null).sort((a,b)=>a-b);
-  const crimes = SUBURB_DATA.map(d=>d.crime_2025).filter(v => v != null).sort((a,b)=>a-b);
+  const rents  = units().map(getRent).filter(v => v != null).sort((a,b)=>a-b);
+  const crimes = units().map(d=>d.crime_2025).filter(v => v != null).sort((a,b)=>a-b);
   medRent  = rents.length  ? rents[Math.floor(rents.length/2)]   : 0;
   medCrime = crimes.length ? crimes[Math.floor(crimes.length/2)] : 0;
   rentLo = rents.length ? rents[0] : 0;
@@ -586,7 +666,7 @@ function buildMarkers() {
   Object.values(markers).forEach(m => { map.removeLayer(m.circle); map.removeLayer(m.label); });
   markers = {};
 
-  SUBURB_DATA.forEach(d => {
+  units().forEach(d => {
     const color = colorOf(d);
     const rent  = getRent(d);
     const over  = rent != null && rent > currentBudget;
@@ -661,7 +741,7 @@ function drawScatter() {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  const pts = SUBURB_DATA
+  const pts = units()
     .map(d => ({ d, rent: getRent(d), crime: d.crime_2025, n: getSample(d) }))
     .filter(p => p.rent != null && p.crime != null);
 
@@ -683,7 +763,9 @@ function drawScatter() {
 
   const sx = v => x0 + (v - rLo)/(rHi - rLo) * (x1 - x0);
   const sy = v => y0 + (Math.log(Math.max(1,v)) - lgLo)/(lgHi - lgLo) * (y1 - y0);
-  const nMax = Math.max(...pts.map(p => p.n || 1));
+  // Ward dots scale by how many suburbs they contain; suburb dots by bonds lodged.
+  pts.forEach(p => { p.size = granularity === 'ward' ? (p.d.memberCount||1) : (p.n||1); });
+  const nMax = Math.max(...pts.map(p => p.size));
   const sr = n => 4 + Math.sqrt((n||1)/nMax) * 9;
   scScales = { sx, sy, sr };
 
@@ -740,7 +822,7 @@ function drawScatter() {
     const over = p.rent > currentBudget;
     const isSel = selected === p.d.suburb;
     const c = el('circle', {
-      cx: sx(p.rent), cy: sy(p.crime), r: sr(p.n),
+      cx: sx(p.rent), cy: sy(p.crime), r: sr(p.size),
       fill: colorOf(p.d),
       'fill-opacity': over ? 0.28 : 0.82,
       stroke: isSel ? '#0F1C18' : '#fff',
@@ -765,8 +847,9 @@ function drawScatter() {
     svg.appendChild(c);
   });
 
-  document.getElementById('scatter-sub').textContent =
-    `${pts.length} suburbs · dot size = bonds lodged`;
+  document.getElementById('scatter-sub').textContent = granularity === 'ward'
+    ? `${pts.length} wards · dot size = suburbs covered`
+    : `${pts.length} suburbs · dot size = bonds lodged`;
 }
 
 // ── BAR CHART (Rent view / Safety view) ──
@@ -777,7 +860,7 @@ function drawBars() {
   const box = svg.parentElement.getBoundingClientRect();
   const isRent = mapMode === 'rent';
 
-  const rows = SUBURB_DATA
+  const rows = units()
     .map(d => ({ d, v: isRent ? getRent(d) : d.crime_2025 }))
     .filter(r => r.v != null)
     .sort((a, b) => a.v - b.v);
@@ -841,7 +924,8 @@ function drawBars() {
   });
 
   document.getElementById('scatter-sub').textContent =
-    `${rows.length} suburbs · ${isRent ? 'cheapest first' : 'safest first'}`;
+    `${rows.length} ${granularity === 'ward' ? 'wards' : 'suburbs'} · ` +
+    `${isRent ? 'cheapest first' : 'safest first'}`;
 }
 
 // ── CROSS-HIGHLIGHT ──
@@ -863,6 +947,14 @@ function highlightMarker(name, on) {
 }
 
 function selectSuburb(name, panMap) {
+  // Clicking a ward drills into it rather than just selecting it.
+  if (granularity === 'ward' && WARD_SUBURBS[name]) {
+    const w = WARD_DATA.find(x => x.suburb === name);
+    granularity = 'suburb';
+    setGranularity('suburb');
+    if (w) map.setView([w.lat, w.lng], 12, { animate: true });
+    return;
+  }
   selected = name;
   const m = markers[name];
   if (m && panMap) map.setView([m.data.lat, m.data.lng], 14, { animate: true });
@@ -872,7 +964,7 @@ function selectSuburb(name, panMap) {
 
 // ── KPI ──
 function updateKPI() {
-  const withRent = SUBURB_DATA.map(d => ({ d, r: getRent(d) })).filter(o => o.r != null);
+  const withRent = units().map(d => ({ d, r: getRent(d) })).filter(o => o.r != null);
   document.getElementById('kpi-median').textContent = medRent ? `$${medRent}` : '—';
   document.getElementById('kpi-median-sub').textContent = `${currentBed} bed · ${currentDwell}`;
 
@@ -880,13 +972,13 @@ function updateKPI() {
   document.getElementById('kpi-cheap').textContent = cheap ? cheap.d.suburb : '—';
   document.getElementById('kpi-cheap-sub').textContent = cheap ? `$${cheap.r}/wk` : 'No data';
 
-  const safe = SUBURB_DATA.filter(d=>d.crime_2025!=null).sort((a,b)=>a.crime_2025-b.crime_2025)[0];
+  const safe = units().filter(d=>d.crime_2025!=null).sort((a,b)=>a.crime_2025-b.crime_2025)[0];
   document.getElementById('kpi-safe').textContent = safe ? safe.suburb : '—';
   document.getElementById('kpi-safe-sub').textContent = safe ? `${safe.crime_2025.toLocaleString()} incidents` : '—';
 
   // Best value = furthest below both medians, measured as a share of each median
   // so rent and incident counts stay comparable.
-  const best = SUBURB_DATA
+  const best = units()
     .map(d => ({ d, rent: getRent(d), crime: d.crime_2025 }))
     .filter(r => quadOf(r.d) === 'best')
     .map(r => ({ ...r, margin: (1 - r.rent/medRent) + (1 - r.crime/medCrime) }))
@@ -895,12 +987,13 @@ function updateKPI() {
   document.getElementById('kpi-best-sub').textContent = best
     ? `$${best.rent}/wk · ${best.crime.toLocaleString()} inc.` : 'None in this filter';
 
-  document.getElementById('map-sub').textContent = `${currentBed} bed · ${currentDwell}`;
+  document.getElementById('map-sub').textContent =
+    `${units().length} ${granularity === 'ward' ? 'wards' : 'suburbs'} · ${currentBed} bed · ${currentDwell}`;
 }
 
 function updateQuadLegend() {
   const counts = { best:0, premium:0, budget:0, avoid:0, none:0 };
-  SUBURB_DATA.forEach(d => counts[quadOf(d)]++);
+  units().forEach(d => counts[quadOf(d)]++);
   document.getElementById('q-legend').innerHTML =
     ['best','premium','budget','avoid','none'].map(k => `
       <div class="q-row">
@@ -910,8 +1003,21 @@ function updateQuadLegend() {
       </div>`).join('');
 }
 
+// ── GRANULARITY ──
+function setGranularity(g) {
+  granularity = g;
+  selected = null;
+  document.getElementById('gran-slider').value = g === 'suburb' ? 1 : 0;
+  document.getElementById('gran-ward').classList.toggle('on', g === 'ward');
+  document.getElementById('gran-suburb').classList.toggle('on', g === 'suburb');
+  const el = document.getElementById('gran-slider');
+  el.style.setProperty('--pct', g === 'suburb' ? '100%' : '0%');
+  refresh();
+}
+
 // ── REFRESH ──
 function refresh() {
+  UNITS = granularity === 'ward' ? WARD_DATA : SUBURB_DATA;
   computeMedians();
   buildMarkers();
   drawChart();
@@ -980,7 +1086,7 @@ function onSearch(val) {
   if (!val.trim()) { resultsEl.classList.remove('open'); return; }
 
   const q = val.toLowerCase();
-  const matches = SUBURB_DATA.filter(d => d.suburb.toLowerCase().includes(q)).slice(0, 8);
+  const matches = units().filter(d => d.suburb.toLowerCase().includes(q)).slice(0, 8);
 
   if (!matches.length) {
     resultsEl.innerHTML = `<div class="search-no-results">No suburbs found</div>`;
@@ -1026,7 +1132,8 @@ document.addEventListener('click', e => {
 
 // ── INIT ──
 document.getElementById('budget-slider').style.setProperty('--pct', '38.9%');
-refresh();
+WARD_DATA = buildWards();
+setGranularity('ward');
 
 let rt;
 window.addEventListener('resize', () => {

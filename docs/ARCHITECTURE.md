@@ -177,6 +177,30 @@ are priced per room, so folding them into the same median would understate what 
 costs. Selecting either also forces the bedroom filter to 1 and disables the rest, since
 shared listings only ever carry a 1-bedroom figure.
 
+### Granularity
+
+A two-stop slider switches every view between **11 wards** and **62 suburbs**; wards are
+the default. `units()` returns whichever set is active, and all rendering — map, chart,
+KPIs, quadrant counts, search — reads from it.
+
+The ward names come from MBIE's `ward-2019` area definition, which is authoritative. They
+are **wards (13 nationally for Auckland), not local boards (21)** — the two systems share
+neither names nor boundaries, and conflating them is an easy mistake to make. Only 11 wards
+appear because none of the 62 suburbs fall inside Manurewa-Papakura or Rodney.
+
+Ward figures are aggregated from member suburbs, not taken from the API's ward endpoint:
+
+- **Rent** — `nCurr`-weighted mean of member medians, per dwelling × bedroom combination
+- **Crime** — plain sum of member counts
+- **Position** — mean of member coordinates (the map draws centroid bubbles, not polygons)
+
+Aggregating locally keeps both metrics scoped to the same 62 suburbs. The API's ward rent
+covers the *entire* council ward, which would not reconcile with crime counts drawn only
+from our subset — a ward would look cheaper and safer than its own suburbs.
+`data/auckland_rent_ward_2026_06.csv` holds the official figures for cross-checking.
+
+Clicking a ward drills into suburb granularity and flies the map to it.
+
 ### Quadrant model
 
 Suburbs are classified against the **median rent and median crime of the currently
