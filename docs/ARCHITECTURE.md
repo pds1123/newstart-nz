@@ -34,12 +34,17 @@ Auth:  Ocp-Apim-Subscription-Key: <key>     # from scraper/.env, never committed
 | Parameter | Value used | Notes |
 | --- | --- | --- |
 | `area-definition` | `statistical-area-unit-2019` | Finest grain available. Territorial-authority level is far too coarse. |
-| `period-ending` | `2025-12` | Latest that works at SAU grain. `2026-03` returns 500 at this grain. |
-| `num-months` | `12` | Rolling 12-month window. ~8,843 rows, 1.7 MB, ~120 s to fetch. |
+| `period-ending` | `2026-06` | Latest available. The window moves: `2025-06` now 500s at this grain while `2026-03` and `2026-06`, which used to fail, succeed. |
+| `num-months` | `12` | Rolling window — `periodCovered` reports 2025-07-01/2026-06-30. ~8,347 rows nationally, ~50 s to fetch. |
 
 Fields consumed: `area`, `dwell`, `nBedrms`, `med`, `nCurr`. The file checked in
-(`data/auckland_rent_sau_2025_annual.csv`) is the Auckland subset — 3,183 rows across
-556 distinct source areas.
+(`data/auckland_rent_sau_2026_06.csv`) is the Auckland subset — 3,050 rows across 548
+source areas. Ward-level figures live in `data/auckland_rent_ward_2026_06.csv`.
+
+`dwell` carries five values, all of which are surfaced: **House**, **Apartment**, **Flat**,
+**Room**, and **Boarding House**. The last three matter disproportionately for this
+audience — a room runs about $370/wk against $600+ for a house — and excluding them
+would hide roughly 13% of active bonds and most of what a student can actually afford.
 
 `med` (median) is used rather than `mean`. Means are dragged upward by high-end listings
 and answer the wrong question for someone asking what they can actually rent.
@@ -106,13 +111,19 @@ Output is `data/suburbs.json` (~16 KB, 62 suburbs) and is inlined into the HTML 
   "lat": -36.883, "lng": 174.753,
   "zone": "inner",              // "inner" (36) | "suburban" (26)
   "crime_2025": 510,            // null when unmapped
-  "rent": {                     // weekly median, NZD
-    "House":     { "1": 523, "2": 667, "3": 809, "4": 1051, "All": 805 },
-    "Apartment": { "1": 500, "2": 623, "3": 1190 }
+  "rent": {                     // weekly median, NZD — five dwelling types
+    "House":     { "1": 646, "2": 666, "3": 811, "4": 1081, "All": 847 },
+    "Apartment": { "1": 489, "2": 628, "3": 1260, "All": 660 },
+    "Flat":      { "1": 460, "2": 571 },
+    "Room":      { "1": 245 },
+    "Boarding House": {}
   },
   "n": {                        // bonds currently active, same shape as rent
-    "House":     { "1": 87, "2": 198, "3": 246, "4": 174, "All": 135 },
-    "Apartment": { "1": 258, "2": 225, "3": 21 }
+    "House":     { "1": 207, "2": 165, "3": 240, "4": 165, "All": 111 },
+    "Apartment": { "1": 243, "2": 243, "3": 24, "All": 6 },
+    "Flat":      { "1": 327, "2": 300 },
+    "Room":      { "1": 15 },
+    "Boarding House": {}
   }
 }
 ```
@@ -133,10 +144,11 @@ Leaflet from CDN, everything else hand-written.
 nav                                    fixed, 52px
 └── workspace                          100vh − nav
     ├── sidebar        280px           search · bedrooms · dwelling · budget · quadrant legend
-    └── panels         flex, 50/50
-        ├── scatter                    hand-built SVG
-        └── map                        Leaflet + KPI bar overlay
-└── recommend          full width      sortable table, below the fold
+    └── panels-col     flex
+        ├── toolbar    full width      Quadrant / Rent view / Safety view
+        └── panels     flex
+            ├── chart  35%             scatter (quadrant) or bar chart (rent/safety)
+            └── map    65%             Leaflet + KPI bar overlay
 ```
 
 Below 1100px the two panels stack vertically.
@@ -144,22 +156,26 @@ Below 1100px the two panels stack vertically.
 ### State
 
 ```js
-let currentBed   = '2';          // '1' | '2' | '3' | '4'
-let currentDwell = 'Apartment';  // 'All' | 'House' | 'Apartment'
-let currentBudget = 650;         // dims markers above this
-let mapMode = 'quadrant';        // 'quadrant' | 'rent' | 'safety'
-let sortKey = 'score', sortDir = -1;
-let selected = null;             // suburb name, drives cross-panel highlight
+let currentBed   = '2';   // '1' | '2' | '3' | '4'
+let currentDwell = 'All'; // 'All' | 'House' | 'Apartment' | 'Flat' | 'Room' | 'Boarding House'
+let currentBudget = 650;  // dims markers above this
+let mapMode = 'quadrant'; // 'quadrant' | 'rent' | 'safety'
+let selected = null;      // suburb name, drives cross-panel highlight
 ```
 
 `refresh()` is the single entry point after any filter change:
 
 ```
-computeMedians() → buildMarkers() → drawScatter() → updateKPI() → updateQuadLegend() → renderTable()
+computeMedians() → buildMarkers() → drawChart() → updateKPI() → updateQuadLegend()
 ```
 
-`'All'` dwelling averages House and Apartment for the selected bedroom count; `getSample`
-sums rather than averages over the same pair.
+`drawChart()` dispatches on `mapMode`: the quadrant scatter, or a horizontal bar chart
+ranked cheapest-first (rent) or safest-first (safety). Bars scroll inside the panel.
+
+`'All'` spans **whole dwellings only** — House, Apartment, Flat. Room and Boarding House
+are priced per room, so folding them into the same median would understate what a place
+costs. Selecting either also forces the bedroom filter to 1 and disables the rest, since
+shared listings only ever carry a 1-bedroom figure.
 
 ### Quadrant model
 
@@ -178,9 +194,11 @@ Because the medians move with the filter, a class is a **relative position withi
 current price bracket**, not an absolute verdict. Switching from 2-bed to 4-bed reshuffles
 the whole board.
 
-`Rent view` and `Safety view` replace quadrant colours with single-metric ramps — linear
-$400–$1,100 for rent, log-scaled for crime (the range spans 25 to 5,599, so a linear ramp
-would collapse almost everything into one band).
+`Rent view` and `Safety view` replace quadrant colours with single-metric ramps. Both
+stretch across the **filtered range** rather than fixed bounds — a 2-bed slice spanning
+$494–$900 rendered as one flat shade under the old fixed $400–$1,100 window. Crime stays
+log-scaled (25 to 5,599 would otherwise collapse into a single band). The toolbar states
+that the scale is relative so the colours are not read as absolute.
 
 ### Scatter plot
 
@@ -199,16 +217,6 @@ directly costs about 80 lines.
 three views. Dots carry `data-suburb` and are looked up with `CSS.escape` (suburb names
 contain spaces).
 
-### Recommendation scoring
-
-```js
-score = ((N − rentRank + 1) + (N − safeRank + 1)) / 2
-```
-
-Both ranks ascend from 1 (cheapest, safest), so the cheapest and safest suburb scores
-highest on both terms. Suburbs missing either metric are excluded outright and the count
-is surfaced in the subheading rather than hidden.
-
 ---
 
 ## Limitations
@@ -219,11 +227,11 @@ is surfaced in the subheading rather than hidden.
    and Auckland Central can never leave the "Not recommended" quadrant. Fixing this needs
    suburb population figures.
 
-2. **The 4 bed+ × Apartment slice is not trustworthy.** Only two suburbs carry a value —
-   $240/wk (Onehunga, n=12) and $269/wk (Auckland Central, n=39). Four-bedroom apartments
-   do not rent for $240, and n=39 rules out small-sample noise; these look like
-   room-by-room lettings mis-categorised at source. Left unfiltered rather than quietly
-   discarded.
+2. **Thin slices still produce implausible figures.** The 4 bed+ × Apartment combination
+   is the clearest case — Auckland Central reports $302/wk on 15 bonds, which is not what a
+   four-bedroom apartment costs and looks like room-by-room lettings mis-categorised at
+   source. No sample-size floor is applied; the tooltip shows `nCurr` so the reader can
+   judge, but a low count is not yet flagged visually.
 
 3. **Boundaries only approximate each other.** SAU and police areas are differently shaped,
    so folding both onto one suburb necessarily introduces error. Figures are indicative.
