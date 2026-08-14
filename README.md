@@ -37,6 +37,12 @@ cp .env.example .env   # then add your MBIE key
 python test_mbie_api.py
 ```
 
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — data pipeline, mapping layer, data model,
+  frontend structure, and the full list of limitations
+- [docs/DEVLOG.md](docs/DEVLOG.md) — 开发日志：踩过的坑和当时的决策理由
+
 ## Known gaps
 
 - **Arch Hill** and **Flat Bush** have no rent or crime data — neither appears in the
