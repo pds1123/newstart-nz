@@ -26,3 +26,6 @@ __pycache__/
 *.log
 scratch/
 tmp/
+
+# Local dev scaffolding (absolute paths, not portable)
+.claude/
