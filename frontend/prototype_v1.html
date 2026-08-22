@@ -59,26 +59,17 @@ nav {
 }
 .nav-link:hover { background: var(--bg); color: var(--text); }
 .nav-link.active { background: var(--green-pale); color: var(--green-dark); font-weight: 600; }
-.nav-link.pending { color: var(--faint); display: flex; align-items: center; gap: 6px; }
-.nav-link.pending:hover { background: var(--bg); color: var(--muted); }
+.nav-link.pending {
+  color: var(--faint); display: flex; align-items: center; gap: 6px;
+  cursor: default;
+}
+.nav-link.pending:hover { background: none; color: var(--faint); }
 .nav-badge {
   font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
   padding: 2px 5px; border-radius: 3px; background: var(--bg);
   border: 1px solid var(--border); color: var(--faint);
 }
 
-/* Notice shown when an unbuilt section is clicked */
-.toast {
-  position: fixed; top: calc(var(--nav-h) + 12px); left: 50%; transform: translateX(-50%) translateY(-8px);
-  z-index: 4000; max-width: 420px; padding: 11px 14px;
-  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--amber);
-  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.13);
-  font-size: 12.5px; line-height: 1.5; color: var(--text);
-  opacity: 0; visibility: hidden; transition: opacity 0.15s, transform 0.15s;
-}
-.toast.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
-.toast b { display: block; margin-bottom: 3px; font-size: 13px; }
-.toast span { color: var(--muted); }
 .nav-right { display: flex; align-items: center; gap: 10px; }
 .nav-city {
   padding: 6px 12px; border-radius: var(--radius-sm);
@@ -301,7 +292,7 @@ input[type=range]::-webkit-slider-thumb {
   <div class="nav-logo">NewStart <span>NZ</span></div>
   <div class="nav-links">
     <a class="nav-link active">Map</a>
-    <a class="nav-link pending" onclick="notBuilt()">AI Agent <span class="nav-badge">Soon</span></a>
+    <a class="nav-link pending">AI Agent <span class="nav-badge">Soon</span></a>
   </div>
   <div class="nav-right">
     <div class="nav-city">
@@ -444,13 +435,6 @@ input[type=range]::-webkit-slider-thumb {
     </div>
   </div>
 
-</div>
-
-<div class="toast" id="toast">
-  <b>AI Agent isn't built yet</b>
-  <span>This is a prototype — only the Map view works today. The agent is
-  planned to answer questions like "safe 2-bed under $600 near a train line"
-  in plain language.</span>
 </div>
 
 <div class="tooltip" id="tooltip">
@@ -1248,15 +1232,6 @@ document.addEventListener('click', e => {
     document.getElementById('search-results').classList.remove('open');
   }
 });
-
-// ── PLACEHOLDER SECTIONS ──
-let toastTimer = null;
-function notBuilt() {
-  const t = document.getElementById('toast');
-  t.classList.add('visible');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('visible'), 4200);
-}
 
 // ── INIT ──
 document.getElementById('budget-slider').style.setProperty('--pct', '38.9%');
