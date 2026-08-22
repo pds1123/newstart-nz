@@ -91,7 +91,7 @@ Of the 220 mapped crime areas, 219 match a row in the crime CSV; the mapping fil
 
 ## Aggregation
 
-Offline Python, run by hand when a source file changes. Per master suburb:
+`scraper/build_dataset.py`, run by hand when a source file changes. Per master suburb:
 
 - **Rent** — collect every mapped source area's rows for a given `dwell` × `nBedrms`,
   then take the mean of their medians. (An unweighted mean of medians is a simplification;
@@ -100,8 +100,18 @@ Offline Python, run by hand when a source file changes. Per master suburb:
 - **Crime** — sum `total_crimes_2025` over mapped police areas. Zero collapses to `null`,
   so "no data" is never confused with "no crime".
 
-Output is `data/suburbs.json` (~16 KB, 62 suburbs) and is inlined into the HTML at the
-`const SUBURB_DATA = …` assignment.
+Output is `data/suburbs.json` (~16 KB, 62 suburbs) plus `data/raw_areas.json` (~85 KB, the
+unaggregated source areas). `scraper/inline_data.py` writes both into the HTML at the
+`const SUBURB_DATA = …` and `const RAW_AREAS = …` assignments — there is no build step, so
+the data lives in the file.
+
+The full pipeline is three scripts:
+
+```bash
+python3 scraper/fetch_rent.py 2026-06      # API  -> data/auckland_rent_{sau,ward}_2026_06.csv
+python3 scraper/build_dataset.py 2026_06   # CSVs -> data/suburbs.json + data/raw_areas.json
+python3 scraper/inline_data.py             # JSON -> frontend/*.html
+```
 
 ### Data model
 

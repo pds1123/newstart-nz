@@ -9,18 +9,21 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Light-theme prototype — search, bedroom/dwelling filters, budget slider, top-10 leaderboard |
+| `frontend/prototype_v1.html` | Main dashboard — ward/suburb granularity, quadrant scatter, rent & safety rankings |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
 | `data/auckland_lb.geojson` | Auckland local board boundaries |
-| `scraper/test_mbie_api.py` | MBIE Market Rent API client |
+| `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
+| `scraper/build_dataset.py` | Folds source areas onto 62 suburbs, writes `suburbs.json` + `raw_areas.json` |
+| `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML pages |
+| `scraper/test_mbie_api.py` | Probe for what the API currently serves |
 
 All frontend files are standalone HTML — open one in a browser, no build step.
 
 ## Data sources
 
 - **Rent** — [MBIE Market Rent API v2](https://api.business.govt.nz/) (Tenancy Services).
-  Statistical Area Unit level, 12 months ending December 2025. Values shown are medians.
+  Statistical Area Unit and ward level, 12 months ending June 2026. Values shown are medians.
 - **Crime** — NZ Police victimisation statistics by suburb, 2025.
 
 The two datasets use different geographic boundaries, so `rent_area_mapping_v2.csv` and
@@ -34,8 +37,17 @@ cd scraper
 python3 -m venv venv && source venv/bin/activate
 pip install requests python-dotenv
 cp .env.example .env   # then add your MBIE key
-python test_mbie_api.py
 ```
+
+Rebuild the dataset end to end (from the repo root):
+
+```bash
+python3 scraper/fetch_rent.py 2026-06 && python3 scraper/build_dataset.py 2026_06 && python3 scraper/inline_data.py
+```
+
+`fetch_rent.py` takes about a minute — the SAU request is large. The available
+period window moves, so run `python3 scraper/test_mbie_api.py` first to see what
+the API currently serves.
 
 ## Documentation
 
