@@ -158,6 +158,18 @@ nav {
 .gran-labels b { font-size: 10px; font-weight: 700; color: var(--faint); }
 .gran-labels span.on { color: var(--green-dark); font-weight: 600; }
 .gran-labels span.on b { color: var(--green); }
+.scope-bar {
+  margin-top: 10px; padding: 6px 9px; border-radius: var(--radius-sm);
+  background: var(--green-pale); display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--green-dark);
+}
+.scope-bar b { font-weight: 700; }
+.scope-bar button {
+  margin-left: auto; border: none; background: none; cursor: pointer;
+  font-size: 10.5px; font-weight: 600; color: var(--green); font-family: inherit;
+  padding: 0; white-space: nowrap;
+}
+.scope-bar button:hover { color: var(--green-dark); }
 
 .slider-value { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .slider-current { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -334,6 +346,7 @@ input[type=range]::-webkit-slider-thumb {
           <span id="gran-suburb">Suburbs<b>62</b></span>
           <span id="gran-raw">Raw<b id="gran-raw-n">—</b></span>
         </div>
+        <div class="scope-bar" id="scope-bar" style="display:none"></div>
       </div>
 
       <div class="sidebar-section">
@@ -539,6 +552,7 @@ function buildRegions() {
 // ── STATE ──
 let granularity = 'region';   // 'region' | 'suburb' | 'raw'
 let GRAN_STOPS = ['region','suburb'];   // third stop appears in the ranking views
+let scope = null;   // parent unit drilled into; narrows the level below it
 let REGION_DATA = [];
 let UNITS = [];             // whatever the current granularity renders
 const units = () => UNITS;
@@ -931,7 +945,7 @@ function rawBarRows(isRent) {
   for (const area in src) {
     const rec = src[area];
     if (!rec.s) continue;                       // outside the 62-suburb footprint
-    if (selected && rec.s !== selected) continue;
+    if (scope && rec.s !== scope) continue;
     let v = null, n = null;
     if (isRent) {
       const cell = (rec.v[currentDwell] || {})[currentBed];
@@ -1038,7 +1052,7 @@ function drawBars() {
   const noun = granularity === 'raw' ? (isRent ? 'statistical areas' : 'police areas')
              : granularity === 'region' ? 'regions' : 'suburbs';
   document.getElementById('scatter-sub').textContent =
-    `${rows.length} ${noun}` + (selected && granularity === 'raw' ? ` in ${selected}` : '') +
+    `${rows.length} ${noun}` + (scope ? ` in ${scope}` : '') +
     ` · ${isRent ? 'cheapest first' : 'safest first'}`;
 }
 
@@ -1060,13 +1074,12 @@ function highlightMarker(name, on) {
   });
 }
 
+// Clicking a unit steps down one stop and narrows to what was clicked. At the
+// finest stop there is nowhere further to go, so it just selects.
 function selectSuburb(name, panMap) {
-  // Clicking a region drills into it rather than just selecting it.
-  if (granularity === 'region' && REGION_SUBURBS[name]) {
-    const w = REGION_DATA.find(x => x.suburb === name);
-    granularity = 'suburb';
-    setGranularity('suburb');
-    if (w) map.setView([w.lat, w.lng], 12, { animate: true });
+  const idx = GRAN_STOPS.indexOf(granularity);
+  if (idx > -1 && idx < GRAN_STOPS.length - 1) {
+    setGranularity(GRAN_STOPS[idx + 1], name);
     return;
   }
   selected = name;
@@ -1118,10 +1131,13 @@ function updateQuadLegend() {
 }
 
 // ── GRANULARITY ──
-function setGranularity(g) {
+function setGranularity(g, into) {
   if (!GRAN_STOPS.includes(g)) g = GRAN_STOPS[GRAN_STOPS.length - 1];
   granularity = g;
   selected = null;
+  // `into` is set when drilling from a click; dragging the slider clears the
+  // scope so the level shows everything again.
+  scope = into || null;
 
   const idx = GRAN_STOPS.indexOf(g);
   const el = document.getElementById('gran-slider');
@@ -1133,7 +1149,18 @@ function setGranularity(g) {
   document.getElementById('gran-raw').classList.toggle('on', g === 'raw');
 
   refresh();
+  renderScope();
   fitToUnits();
+}
+
+function clearScope() { setGranularity(granularity); }
+
+function renderScope() {
+  const el = document.getElementById('scope-bar');
+  if (!scope) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = `<span>Within <b>${scope}</b></span>` +
+                 `<button onclick="clearScope()">Show all \u00D7</button>`;
 }
 
 // The ranking views can drop to the boundaries each dataset ships with; the
@@ -1163,7 +1190,18 @@ function fitToUnits() {
 // ── REFRESH ──
 function refresh() {
   // 'raw' has no coordinates of its own, so the map falls back to suburbs.
-  UNITS = granularity === 'region' ? REGION_DATA : SUBURB_DATA;
+  if (granularity === 'region') {
+    UNITS = REGION_DATA;
+  } else if (scope && REGION_SUBURBS[scope]) {
+    const members = REGION_SUBURBS[scope];
+    UNITS = SUBURB_DATA.filter(d => members.includes(d.suburb));
+  } else if (scope) {
+    // Scoped to one suburb at the raw stop — keep the map on just that suburb
+    // so it matches what the chart lists.
+    UNITS = SUBURB_DATA.filter(d => d.suburb === scope);
+  } else {
+    UNITS = SUBURB_DATA;
+  }
   updateToolbarNote();
   computeMedians();
   buildMarkers();

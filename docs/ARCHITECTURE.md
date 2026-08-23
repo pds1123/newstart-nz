@@ -221,8 +221,21 @@ Region figures are aggregated from member suburbs:
 - **Crime** — plain sum of member counts
 - **Position** — mean of member coordinates (the map draws centroid bubbles, not polygons)
 
-Both metrics therefore cover exactly the same 62 suburbs. Clicking a region drills into
-suburb granularity and flies the map to it.
+Both metrics therefore cover exactly the same 62 suburbs.
+
+### Drilling
+
+Clicking any unit steps down one stop and narrows to what was clicked, tracked in `scope`:
+
+```
+Regions ──click East──> Suburbs (East's 16) ──click Howick──> Raw (Howick's 3 areas)
+```
+
+At the finest stop a click only selects, since there is nowhere further to go. `scope`
+filters the chart, the map and the KPIs together, so the numbers describe the drilled-into
+area rather than all of Auckland. Dragging the slider clears it, as does the *Show all*
+button on the scope bar. At the raw stop the map holds the single scoped suburb — the
+source areas themselves cannot be drawn.
 
 ### Quadrant model
 
