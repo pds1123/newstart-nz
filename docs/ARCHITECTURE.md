@@ -189,10 +189,24 @@ shared listings only ever carry a 1-bedroom figure.
 
 ### Granularity
 
-A two-stop slider switches every view between **5 regions** and **62 suburbs**; regions are
-the default. `units()` returns whichever set is active, and all rendering — map, chart,
-KPIs, quadrant counts, search — reads from it. Switching refits the map to the active set,
-since five centroids sit far wider apart than 62 suburb markers.
+A slider switches granularity; regions are the default. `units()` returns whichever set is
+active, and all rendering — map, chart, KPIs, quadrant counts, search — reads from it.
+Switching refits the map to the active set, since five centroids sit far wider apart than
+62 suburb markers.
+
+The stops depend on the view:
+
+| View | Stops |
+| --- | --- |
+| Quadrant | Regions (5) · Suburbs (62) |
+| Rent view | Regions (5) · Suburbs (62) · Raw (548 statistical areas) |
+| Safety view | Regions (5) · Suburbs (62) · Raw (405 police areas) |
+
+The quadrant scatter has no raw stop because a point needs both a rent and a crime value,
+and the two datasets' raw areas are different geographies — there is nothing to join on.
+`GRAN_STOPS` holds the active list, and asking for a stop the current view does not offer
+falls back to suburbs. At the raw stop the map stays on suburbs, since source areas have
+no coordinates; a banner says so.
 
 The regions are plain compass groupings — Central, East, South, West, North — covering all
 62 suburbs with no overlaps or gaps. They are **not** council wards or local boards. Those

@@ -153,6 +153,7 @@ nav {
 #gran-slider { margin-bottom: 7px; }
 .gran-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
 .gran-labels span { display: flex; flex-direction: column; line-height: 1.35; }
+.gran-labels span:nth-child(2) { text-align: center; }
 .gran-labels span:last-child { text-align: right; }
 .gran-labels b { font-size: 10px; font-weight: 700; color: var(--faint); }
 .gran-labels span.on { color: var(--green-dark); font-weight: 600; }
@@ -327,10 +328,11 @@ input[type=range]::-webkit-slider-thumb {
       <div class="sidebar-section" id="gran-section">
         <div class="filter-label">Granularity</div>
         <input type="range" id="gran-slider" min="0" max="1" step="1" value="0"
-               oninput="setGranularity(+this.value ? 'suburb' : 'region')">
+               oninput="setGranularity(GRAN_STOPS[+this.value])">
         <div class="gran-labels">
           <span id="gran-region">Regions<b>5</b></span>
           <span id="gran-suburb">Suburbs<b>62</b></span>
+          <span id="gran-raw">Raw<b id="gran-raw-n">—</b></span>
         </div>
       </div>
 
@@ -535,7 +537,8 @@ function buildRegions() {
 }
 
 // ── STATE ──
-let granularity = 'region';   // 'region' | 'suburb'
+let granularity = 'region';   // 'region' | 'suburb' | 'raw'
+let GRAN_STOPS = ['region','suburb'];   // third stop appears in the ranking views
 let REGION_DATA = [];
 let UNITS = [];             // whatever the current granularity renders
 const units = () => UNITS;
@@ -908,12 +911,20 @@ function drawScatter() {
 
 // ── BAR CHART (Rent view / Safety view) ──
 const BAR_ROW = 19, BAR_PAD_R = 46, BAR_TOP = 26;
-const BAR_LABEL_W = () => (mapMode === 'quadrant' ? 104 : 152);
+const BAR_LABEL_W = () => (granularity === 'raw' ? 152 : 104);
 
 
 // Rows for the ranking chart. Rent and Safety views drop to the raw source
 // boundaries each dataset ships with; selecting a suburb narrows them to that
 // suburb's own source areas.
+// Rows at region or suburb granularity — the aggregated values the map shows.
+function unitBarRows(isRent) {
+  return units()
+    .map(d => ({ d, v: isRent ? getRent(d) : d.crime_2025, n: getSample(d) }))
+    .filter(r => r.v != null)
+    .sort((a, b) => a.v - b.v);
+}
+
 function rawBarRows(isRent) {
   const src = isRent ? RAW_AREAS.rent : RAW_AREAS.crime;
   const rows = [];
@@ -944,7 +955,7 @@ function drawBars() {
   const svg = document.getElementById('scatter');
   const box = svg.parentElement.getBoundingClientRect();
   const isRent = mapMode === 'rent';
-  const rows = rawBarRows(isRent);
+  const rows = granularity === 'raw' ? rawBarRows(isRent) : unitBarRows(isRent);
 
   const W = Math.max(300, box.width);
   const H = BAR_TOP + rows.length * BAR_ROW + 10;
@@ -1024,9 +1035,11 @@ function drawBars() {
     t.textContent = full.slice(0, lo) + '\u2026';
   });
 
+  const noun = granularity === 'raw' ? (isRent ? 'statistical areas' : 'police areas')
+             : granularity === 'region' ? 'regions' : 'suburbs';
   document.getElementById('scatter-sub').textContent =
-    `${rows.length} ${isRent ? 'statistical areas' : 'police areas'}` +
-    (selected ? ` in ${selected}` : '') + ` · ${isRent ? 'cheapest first' : 'safest first'}`;
+    `${rows.length} ${noun}` + (selected && granularity === 'raw' ? ` in ${selected}` : '') +
+    ` · ${isRent ? 'cheapest first' : 'safest first'}`;
 }
 
 // ── CROSS-HIGHLIGHT ──
@@ -1106,15 +1119,38 @@ function updateQuadLegend() {
 
 // ── GRANULARITY ──
 function setGranularity(g) {
+  if (!GRAN_STOPS.includes(g)) g = GRAN_STOPS[GRAN_STOPS.length - 1];
   granularity = g;
   selected = null;
-  document.getElementById('gran-slider').value = g === 'suburb' ? 1 : 0;
+
+  const idx = GRAN_STOPS.indexOf(g);
+  const el = document.getElementById('gran-slider');
+  el.value = idx;
+  el.style.setProperty('--pct', (idx / (GRAN_STOPS.length - 1) * 100) + '%');
+
   document.getElementById('gran-region').classList.toggle('on', g === 'region');
   document.getElementById('gran-suburb').classList.toggle('on', g === 'suburb');
-  const el = document.getElementById('gran-slider');
-  el.style.setProperty('--pct', g === 'suburb' ? '100%' : '0%');
+  document.getElementById('gran-raw').classList.toggle('on', g === 'raw');
+
   refresh();
   fitToUnits();
+}
+
+// The ranking views can drop to the boundaries each dataset ships with; the
+// quadrant scatter cannot, since rent and crime raw areas are different
+// geographies and a point needs both.
+function syncGranStops() {
+  const raw = mapMode !== 'quadrant';
+  GRAN_STOPS = raw ? ['region','suburb','raw'] : ['region','suburb'];
+  const el = document.getElementById('gran-slider');
+  el.max = GRAN_STOPS.length - 1;
+  document.getElementById('gran-raw').style.display = raw ? '' : 'none';
+  if (raw) {
+    const n = mapMode === 'rent' ? Object.keys(RAW_AREAS.rent).length
+                                 : Object.keys(RAW_AREAS.crime).length;
+    document.getElementById('gran-raw-n').textContent = n;
+  }
+  if (!GRAN_STOPS.includes(granularity)) setGranularity('suburb');
 }
 
 // Five region centroids sit far wider apart than 62 suburb markers, so a view
@@ -1126,7 +1162,9 @@ function fitToUnits() {
 
 // ── REFRESH ──
 function refresh() {
+  // 'raw' has no coordinates of its own, so the map falls back to suburbs.
   UNITS = granularity === 'region' ? REGION_DATA : SUBURB_DATA;
+  updateToolbarNote();
   computeMedians();
   buildMarkers();
   drawChart();
@@ -1167,15 +1205,7 @@ function syncBedAvailability() {
 }
 function setMapMode(m) {
   mapMode = m;
-  // Raw views roll up to suburbs, so pin the map there rather than leaving it
-  // on regions, which the source areas do not correspond to.
-  if (m !== 'quadrant' && granularity !== 'suburb') {
-    granularity = 'suburb';
-    UNITS = SUBURB_DATA;
-    document.getElementById('gran-slider').value = 1;
-    document.getElementById('gran-region').classList.remove('on');
-    document.getElementById('gran-suburb').classList.add('on');
-  }
+  syncGranStops();
   document.getElementById('btn-quad').classList.toggle('active', m==='quadrant');
   document.getElementById('btn-rent').classList.toggle('active', m==='rent');
   document.getElementById('btn-safety').classList.toggle('active', m==='safety');
@@ -1184,12 +1214,16 @@ function setMapMode(m) {
   refresh();   // medians and KPIs depend on granularity, which this may have changed
   document.getElementById('q-legend-section').style.display =
     m === 'quadrant' ? '' : 'none';
-  // Raw views drop the granularity control — they are already at the finest grain.
-  document.getElementById('gran-section').style.display = m === 'quadrant' ? '' : 'none';
-  document.getElementById('toolbar-note').innerHTML = m === 'quadrant' ? ''
-    : '\u26A0\uFE0F Showing raw data boundaries. Rent and safety use different '
-      + 'geographic systems at this level, and the map stays at suburb level '
-      + '\u2014 these areas have no coordinates.';
+  updateToolbarNote();
+}
+
+// Only the raw stop needs a caveat; regions and suburbs line up across both
+// datasets because the mapping layer put them there.
+function updateToolbarNote() {
+  document.getElementById('toolbar-note').innerHTML = granularity !== 'raw' ? ''
+    : '\u26A0\uFE0F Raw source boundaries. Rent and safety use different geographic '
+      + 'systems here, so the two rankings are not comparable, and the map stays at '
+      + 'suburb level \u2014 these areas have no coordinates.';
 }
 function onSlider(elm) {
   currentBudget = +elm.value;
@@ -1254,6 +1288,7 @@ document.addEventListener('click', e => {
 // ── INIT ──
 document.getElementById('budget-slider').style.setProperty('--pct', '38.9%');
 REGION_DATA = buildRegions();
+syncGranStops();
 setGranularity('region');
 
 let rt;
