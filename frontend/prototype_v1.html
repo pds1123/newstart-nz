@@ -457,12 +457,12 @@ input[type=range]::-webkit-slider-thumb {
   <div class="tt-row">
     <span class="tt-icon">🏠</span><span class="tt-key">Rent</span>
     <span class="tt-val rent" id="tt-rent"></span>
-    <button class="tt-jump" id="tt-rent-jump" onclick="jumpTo('rent')">Rent detail →</button>
+    <button class="tt-jump" id="tt-rent-jump" onclick="jumpTo('rent')"></button>
   </div>
   <div class="tt-row">
     <span class="tt-icon">🔒</span><span class="tt-key">Safety</span>
     <span class="tt-val" id="tt-crime"></span>
-    <button class="tt-jump" id="tt-safety-jump" onclick="jumpTo('safety')">Safety detail →</button>
+    <button class="tt-jump" id="tt-safety-jump" onclick="jumpTo('safety')"></button>
   </div>
   <div class="tt-row">
     <span class="tt-icon">📊</span><span class="tt-key">Sample</span>
@@ -673,8 +673,20 @@ function showTip(d, clientX, clientY) {
   sEl.textContent = sample ? sample.toLocaleString() + ' bonds' : 'No data';
   sEl.className = 'tt-val' + (sample ? '' : ' na');
 
-  document.getElementById('tt-rent-jump').disabled = rent == null;
-  document.getElementById('tt-safety-jump').disabled = d.crime_2025 == null;
+  // The jump switches to a ranking view, which always offers all three stops,
+  // so the next stop is read off the full ladder rather than the current view's.
+  const LADDER = ['region', 'suburb', 'raw'];
+  const next = LADDER[LADDER.indexOf(granularity) + 1];
+  const into = next === 'suburb' ? 'by suburb' : next === 'raw' ? 'by area' : null;
+
+  const rj = document.getElementById('tt-rent-jump');
+  const sj = document.getElementById('tt-safety-jump');
+  // At the finest stop there is nowhere to drill, so the jump just swaps which
+  // ranking is on screen — say that rather than implying a level change.
+  rj.textContent = into ? `Rent ${into} \u2192` : 'Rent ranking \u2192';
+  sj.textContent = into ? `Safety ${into} \u2192` : 'Safety ranking \u2192';
+  rj.disabled = rent == null;
+  sj.disabled = d.crime_2025 == null;
 
   let x = clientX + 14, y = clientY - 10;
   if (x + 280 > window.innerWidth)  x = clientX - 284;
