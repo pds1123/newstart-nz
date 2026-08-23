@@ -189,27 +189,26 @@ shared listings only ever carry a 1-bedroom figure.
 
 ### Granularity
 
-A two-stop slider switches every view between **11 wards** and **62 suburbs**; wards are
+A two-stop slider switches every view between **5 regions** and **62 suburbs**; regions are
 the default. `units()` returns whichever set is active, and all rendering — map, chart,
-KPIs, quadrant counts, search — reads from it.
+KPIs, quadrant counts, search — reads from it. Switching refits the map to the active set,
+since five centroids sit far wider apart than 62 suburb markers.
 
-The ward names come from MBIE's `ward-2019` area definition, which is authoritative. They
-are **wards (13 nationally for Auckland), not local boards (21)** — the two systems share
-neither names nor boundaries, and conflating them is an easy mistake to make. Only 11 wards
-appear because none of the 62 suburbs fall inside Manurewa-Papakura or Rodney.
+The regions are plain compass groupings — Central, East, South, West, North — covering all
+62 suburbs with no overlaps or gaps. They are **not** council wards or local boards. Those
+are real boundaries with their own names, and an earlier attempt to use them conflated the
+two systems (13 wards vs 21 local boards, different names, different lines). Official
+ward-level rent from the API is kept in `data/auckland_rent_ward_2026_06.csv` for reference
+but is not what the UI groups by.
 
-Ward figures are aggregated from member suburbs, not taken from the API's ward endpoint:
+Region figures are aggregated from member suburbs:
 
 - **Rent** — `nCurr`-weighted mean of member medians, per dwelling × bedroom combination
 - **Crime** — plain sum of member counts
 - **Position** — mean of member coordinates (the map draws centroid bubbles, not polygons)
 
-Aggregating locally keeps both metrics scoped to the same 62 suburbs. The API's ward rent
-covers the *entire* council ward, which would not reconcile with crime counts drawn only
-from our subset — a ward would look cheaper and safer than its own suburbs.
-`data/auckland_rent_ward_2026_06.csv` holds the official figures for cross-checking.
-
-Clicking a ward drills into suburb granularity and flies the map to it.
+Both metrics therefore cover exactly the same 62 suburbs. Clicking a region drills into
+suburb granularity and flies the map to it.
 
 ### Quadrant model
 
@@ -227,6 +226,11 @@ filtered slice**, recomputed on every filter change:
 Because the medians move with the filter, a class is a **relative position within the
 current price bracket**, not an absolute verdict. Switching from 2-bed to 4-bed reshuffles
 the whole board.
+
+The split is strict (`rent < median`), so with an odd number of units the median item falls
+on the "not cheap" side, and likewise for crime. Across 62 suburbs this is noise. Across 5
+regions it is not: two of the five get pushed off their good side by exactly one place, and
+Best value can come out empty. The quadrant view is coarse at region granularity.
 
 `Rent view` and `Safety view` replace quadrant colours with single-metric ramps. Both
 stretch across the **filtered range** rather than fixed bounds — a 2-bed slice spanning
