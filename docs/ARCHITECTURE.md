@@ -166,11 +166,17 @@ Below 1100px the two panels stack vertically.
 ### State
 
 ```js
-let currentBed   = '2';   // '1' | '2' | '3' | '4'
-let currentDwell = 'All'; // 'All' | 'House' | 'Apartment' | 'Flat' | 'Room' | 'Boarding House'
-let currentBudget = 650;  // dims markers above this
-let mapMode = 'quadrant'; // 'quadrant' | 'rent' | 'safety'
-let selected = null;      // suburb name, drives cross-panel highlight
+let currentBed   = '2';     // '1' | '2' | '3' | '4'
+let currentDwell = 'All';   // 'All' | 'House' | 'Apartment' | 'Flat' | 'Room' | 'Boarding House'
+let currentBudget = 650;    // dims markers above this
+let mapMode = 'quadrant';   // 'quadrant' | 'rent' | 'safety'
+
+let granularity = 'region'; // 'region' | 'suburb' | 'raw'
+let GRAN_STOPS = [...];     // stops the current view offers; the raw stop is
+                            // added only in the ranking views
+let scope = null;           // parent unit drilled into; narrows the level below
+let UNITS = [];             // whatever the active granularity renders
+let selected = null;        // drives cross-panel highlight at the finest stop
 ```
 
 `refresh()` is the single entry point after any filter change:
@@ -191,16 +197,16 @@ shared listings only ever carry a 1-bedroom figure.
 
 A slider switches granularity; regions are the default. `units()` returns whichever set is
 active, and all rendering — map, chart, KPIs, quadrant counts, search — reads from it.
-Switching refits the map to the active set, since five centroids sit far wider apart than
+Switching refits the map to the active set, since six centroids sit far wider apart than
 62 suburb markers.
 
 The stops depend on the view:
 
 | View | Stops |
 | --- | --- |
-| Quadrant | Regions (5) · Suburbs (62) |
-| Rent view | Regions (5) · Suburbs (62) · Raw (548 statistical areas) |
-| Safety view | Regions (5) · Suburbs (62) · Raw (405 police areas) |
+| Quadrant | Regions (6) · Suburbs (62) |
+| Rent view | Regions (6) · Suburbs (62) · Raw (548 statistical areas) |
+| Safety view | Regions (6) · Suburbs (62) · Raw (405 police areas) |
 
 The quadrant scatter has no raw stop because a point needs both a rent and a crime value,
 and the two datasets' raw areas are different geographies — there is nothing to join on.
@@ -208,8 +214,10 @@ and the two datasets' raw areas are different geographies — there is nothing t
 falls back to suburbs. At the raw stop the map stays on suburbs, since source areas have
 no coordinates; a banner says so.
 
-The regions are plain compass groupings — Central, East, South, West, North — covering all
-62 suburbs with no overlaps or gaps. They are **not** council wards or local boards. Those
+The regions are CBD plus five compass groupings — Central, East, South, West, North —
+covering all 62 suburbs with no overlaps or gaps. CBD holds Auckland Central alone, which
+already aggregates the whole city centre (Queen Street, Britomart, Viaduct, Wynyard,
+Shortland Street, Victoria Park, Hobson Ridge, Freemans Bay). They are **not** council wards or local boards. Those
 are real boundaries with their own names, and an earlier attempt to use them conflated the
 two systems (13 wards vs 21 local boards, different names, different lines). Official
 ward-level rent from the API is kept in `data/auckland_rent_ward_2026_06.csv` for reference
@@ -286,30 +294,57 @@ contain spaces).
 
 ## Limitations
 
-1. **Crime is absolute, not per capita.** The single biggest threat to the conclusions.
-   Auckland Central logs 4,914 incidents and Glendowie 25, but their populations and
-   footfall differ by orders of magnitude, so dense suburbs are systematically penalised
-   and Auckland Central can never leave the "Not recommended" quadrant. Fixing this needs
-   suburb population figures.
+Ordered by how much they threaten the conclusions.
 
-2. **Thin slices still produce implausible figures.** The 4 bed+ × Apartment combination
-   is the clearest case — Auckland Central reports $302/wk on 15 bonds, which is not what a
-   four-bedroom apartment costs and looks like room-by-room lettings mis-categorised at
-   source. No sample-size floor is applied; the tooltip shows `nCurr` so the reader can
-   judge, but a low count is not yet flagged visually.
+1. **Crime is absolute, not per capita.** The single biggest threat. Auckland Central logs
+   4,914 incidents and Glendowie 25, but their populations and footfall differ by orders of
+   magnitude, so dense areas are systematically penalised. Fixing this needs suburb
+   population figures.
 
-3. **Boundaries only approximate each other.** SAU and police areas are differently shaped,
+2. **Region crime is a plain sum, so regions of different sizes are not comparable.** A
+   direct consequence of the point above, and CBD makes it visible: holding one suburb, it
+   posts the lowest regional total (4,914) and therefore reads as *safest*, while Auckland
+   Central ranks second-highest for incidents among all 62 suburbs. Per member suburb it is
+   the worst region by a factor of three.
+
+   | Region | Suburbs | Crime total | Per suburb |
+   | --- | --- | --- | --- |
+   | CBD | 1 | 4,914 | **4,914** |
+   | Central | 11 | 6,758 | 614 |
+   | East | 16 | 7,672 | 480 |
+   | South | 12 | 18,864 | 1,572 |
+
+3. **Social housing depresses some medians.** Glen Innes East-Wai O Taiki Bay reports
+   $194/wk for a 2-bedroom house on 219 bonds, with a lower quartile of $127. These are
+   Kāinga Ora tenancies on income-related rent (25% of income), not market listings. Only
+   four source areas show the pattern and three fall outside coverage, but Glen Innes lands
+   at $404 — the mean of $194 and $615 — which is not obtainable privately. Left as-is:
+   MBIE carries no field distinguishing social from private tenancies.
+
+4. **Suburb coordinates are hand-placed.** The `lat`/`lng` in `suburbs.json` come from a
+   hardcoded dictionary, not from any authoritative source — decimal precision varies from
+   two to four places. Every marker lands somewhere plausible, but these are eyeballed
+   positions, not centroids. LINZ's NZ Suburbs and Localities dataset would fix this and
+   simultaneously unlock choropleth polygons and point-in-polygon address lookup.
+
+5. **Sparse filter combinations still produce implausible figures.** 4 bed+ × Apartment is
+   the clearest case — Auckland Central reports $302/wk on 15 bonds, which looks like
+   room-by-room lettings mis-categorised at source. No sample-size floor is applied; the
+   tooltip shows `nCurr` so the reader can judge, but a low count carries no visual flag.
+
+6. **Boundaries only approximate each other.** SAU and police areas are differently shaped,
    so folding both onto one suburb necessarily introduces error. Figures are indicative.
 
-4. **Coverage is 70%.** The 62 suburbs account for 55,970 of Auckland's 79,812 incidents.
+7. **Coverage is 70%.** The 62 suburbs account for 55,970 of Auckland's 79,812 incidents.
    The remainder sits in outer areas (Papakura, Pukekohe, Waiheke) that are out of scope.
 
-5. **Flat Bush has no crime figure.** Rent arrives via Ormiston, but the police mapping
+8. **Flat Bush has no crime figure.** Rent arrives via Ormiston, but the police mapping
    assigns Ormiston to Botany. Moving it would distort Botany, and a single police area
    would understate Flat Bush badly enough to render it falsely "safe". Left null.
 
-6. **Rent aggregation is an unweighted mean of medians.** A source area with 4 bonds counts
-   as much as one with 400. Weighting by `nCurr` would be more defensible.
+9. **Rent aggregation is an unweighted mean of medians.** A source area with 4 bonds counts
+   as much as one with 400. Weighting by `nCurr` would be more defensible. Region-level
+   aggregation *does* weight by `nCurr`; suburb-level does not.
 
 ---
 
