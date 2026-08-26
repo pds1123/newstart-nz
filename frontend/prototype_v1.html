@@ -171,6 +171,26 @@ nav {
 }
 .scope-bar button:hover { color: var(--green-dark); }
 
+/* Data provenance */
+dl.src { margin: 0; font-size: 11px; line-height: 1.45; }
+dl.src dt {
+  font-weight: 700; color: var(--text); margin-top: 9px;
+  font-size: 10.5px; letter-spacing: 0.2px;
+}
+dl.src dt:first-child { margin-top: 0; }
+dl.src dd { margin: 1px 0 0; color: var(--muted); }
+dl.src a { color: var(--green); text-decoration: none; }
+dl.src a:hover { text-decoration: underline; }
+.src-period {
+  display: block; color: var(--text); font-weight: 600;
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.src-note { display: block; color: var(--faint); font-size: 10px; margin-top: 1px; }
+.src-warn {
+  margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--border);
+  font-size: 10px; line-height: 1.5; color: var(--faint);
+}
+
 .slider-value { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .slider-current { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .slider-range { font-size: 11px; color: var(--muted); }
@@ -387,6 +407,29 @@ input[type=range]::-webkit-slider-thumb {
       <div class="sidebar-section" id="q-legend-section">
         <div class="filter-label">Quadrant</div>
         <div class="q-legend" id="q-legend"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="filter-label">Data sources</div>
+        <dl class="src">
+          <dt>Rent</dt>
+          <dd>
+            <a href="https://api.business.govt.nz/" target="_blank" rel="noopener">MBIE Market Rent</a>
+            · statistical area unit
+            <span class="src-period">Jul 2025 – Jun 2026</span>
+            <span class="src-note">Weekly medians of active bonds</span>
+          </dd>
+          <dt>Safety</dt>
+          <dd>
+            NZ Police victimisations
+            <span class="src-period">Jan – Dec 2025</span>
+            <span class="src-note">Absolute counts, not per capita</span>
+          </dd>
+        </dl>
+        <div class="src-warn">
+          The two datasets cover different periods and different boundaries;
+          suburb figures are indicative rather than exact.
+        </div>
       </div>
     </div>
 
@@ -740,7 +783,7 @@ function jumpTo(mode) {
 const map = L.map('map', { center: [-36.87,174.78], zoom: 11, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OSM &copy; CARTO · Rent: MBIE 2025 · Crime: NZ Police 2025',
+  attribution: '&copy; OSM &copy; CARTO · Rent: MBIE to Jun 2026 · Crime: NZ Police 2025',
   subdomains: 'abcd', maxZoom: 19
 }).addTo(map);
 map.attributionControl.setPrefix('');
