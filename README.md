@@ -22,13 +22,29 @@ All frontend files are standalone HTML — open one in a browser, no build step.
 
 ## Data sources
 
-- **Rent** — [MBIE Market Rent API v2](https://api.business.govt.nz/) (Tenancy Services).
-  Statistical Area Unit and ward level, 12 months ending June 2026. Values shown are medians.
-- **Crime** — NZ Police victimisation statistics by suburb, 2025.
+**Rent** — [MBIE Market Rent API v2](https://api.business.govt.nz/) (Tenancy Services),
+pulled by `scraper/fetch_rent.py`. Statistical area unit and ward level, 12 months ending
+June 2026 (covers 2025-07-01 to 2026-06-30). Values shown are medians.
+
+**Crime** — NZ Police *Victimisations Time and Place*, downloaded by hand from the Tableau
+report and saved to `data/`:
+
+- Report: <https://public.tableau.com/views/VictimisationsTimeandPlace/Summary>
+- Landing page: [policedata.nz](https://www.police.govt.nz/about-us/publications-statistics/data-and-statistics/policedatanz)
+
+Set **Region** to `Auckland Region`, **Territorial Authority** to `Auckland`, and
+**Boundary to display** to `Area Unit` — the mapping table is built against area units, so
+any other boundary will not join. Export from the *Download* tab as a crosstab CSV, then
+reshape to `suburb,total_crimes_2025`. Note that the report excludes victim demographics,
+homicides, and non-burglary victimisations occurring in dwellings, so counts sit below the
+true totals by design.
+
+The current file covers calendar 2025, which does **not** line up with the rent window —
+worth aligning on the next refresh.
 
 The two datasets use different geographic boundaries, so `rent_area_mapping_v2.csv` and
 `crime_area_mapping_v2.csv` fold 556 rent source areas and 416 police source areas onto a
-shared set of 63 Auckland suburbs. Coverage: 59/63 have rent figures, 61/63 have crime counts.
+shared set of 62 Auckland suburbs. Coverage: 62/62 have rent figures, 61/62 have crime counts.
 
 ## Running the scraper
 
