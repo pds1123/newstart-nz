@@ -14,13 +14,14 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(REPO, "data")
 
 TARGETS = {
-    "frontend/prototype_v1.html": ["SUBURB_DATA", "RAW_AREAS"],
+    "frontend/prototype_v1.html": ["SUBURB_DATA", "RAW_AREAS", "SUBURB_GEO"],
     "frontend/auckland_map.html": ["SUBURB_DATA"],
 }
 
 SOURCES = {
     "SUBURB_DATA": os.path.join(DATA, "suburbs.json"),
     "RAW_AREAS": os.path.join(DATA, "raw_areas.json"),
+    "SUBURB_GEO": os.path.join(DATA, "linz_suburbs.geojson"),
 }
 
 # A JSON array opens with [ and an object with {; match whichever this const holds.
@@ -32,12 +33,16 @@ def main():
         path = os.path.join(REPO, rel)
         html = open(path).read()
         for name in consts:
+            # First run replaces the placeholder left by the template.
+            html = html.replace("__GEO__", "{}") if name == "SUBURB_GEO" and "__GEO__" in html else html
             payload = open(SOURCES[name]).read().strip()
             pattern = PATTERN.format(name=name)
             if not re.search(pattern, html, flags=re.DOTALL):
                 print(f"  ! {rel}: no `const {name}` assignment found, skipped")
                 continue
-            html = re.sub(pattern, f"const {name} = {payload};", html,
+            # lambda replacement: the JSON payload contains \u escapes that
+            # re.sub would otherwise try to interpret.
+            html = re.sub(pattern, lambda _m: f"const {name} = {payload};", html,
                           count=1, flags=re.DOTALL)
         open(path, "w").write(html)
         sizes = ", ".join(f"{n}={len(json.load(open(SOURCES[n]))):,} entries"

@@ -12,9 +12,11 @@ can weigh cost against safety when choosing where to live.
 | `frontend/prototype_v1.html` | Main dashboard — ward/suburb granularity, quadrant scatter, rent & safety rankings |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
-| `data/auckland_lb.geojson` | Auckland local board boundaries |
+| `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
+| `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
+| `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |
 | `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
-| `scraper/build_dataset.py` | Folds source areas onto 62 suburbs, writes `suburbs.json` + `raw_areas.json` |
+| `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json` + `raw_areas.json` |
 | `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML pages |
 | `scraper/test_mbie_api.py` | Probe for what the API currently serves |
 
@@ -30,9 +32,17 @@ June 2026 (covers 2025-07-01 to 2026-06-30). Values shown are medians.
 exported by hand at area-unit level for calendar 2025. The export has a few traps in it —
 see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#refreshing-the-crime-data) before repeating it.
 
-The two datasets use different geographic boundaries, so `rent_area_mapping_v2.csv` and
-`crime_area_mapping_v2.csv` fold 556 rent source areas and 416 police source areas onto a
-shared set of 62 Auckland suburbs. Coverage: 62/62 have rent figures, 61/62 have crime counts.
+**Boundaries and population** — LINZ
+[NZ Suburbs and Localities](https://data.linz.govt.nz/layer/113764-nz-suburbs-and-localities/),
+CC BY 4.0. Supplies the suburb list itself, polygon boundaries, centroids and Stats NZ
+population estimates. *Sourced from the LINZ Data Service and licensed for reuse under
+CC BY 4.0.*
+
+The three datasets use different geographic boundaries, so `rent_area_mapping_linz.csv` and
+`crime_area_mapping_linz.csv` fold 548 rent source areas and 405 police source areas onto
+the 172 LINZ suburbs of urban Auckland. Coverage: 149/172 have rent figures, 114/172 have
+crime counts, 170/172 have population. Suburbs with no data are shown as such rather than
+dropped.
 
 ## Running the scraper
 
