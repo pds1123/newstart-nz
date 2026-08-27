@@ -375,8 +375,8 @@ input[type=range]::-webkit-slider-thumb {
       </div>
 
       <div class="sidebar-section" id="gran-section">
-        <div class="filter-label">Granularity</div>
-        <select class="select" id="gran-select" onchange="setGranularity(this.value)"></select>
+        <div class="filter-label">Area</div>
+        <select class="select" id="area-select" onchange="setArea(this.value)"></select>
         <div class="bed-note" id="gran-note"></div>
       </div>
 
@@ -1850,8 +1850,7 @@ function setGranularity(g, into) {
   // clears the scope so that level shows everything again.
   scope = into || null;
 
-  document.getElementById('gran-select').value = g;
-  document.getElementById('gran-note').textContent = GRAN_NOTE[g];
+  syncAreaSelect();
 
   refresh();
   renderCrumbs();
@@ -1860,29 +1859,57 @@ function setGranularity(g, into) {
 
 
 
-// The ranking views can drop to the boundaries each dataset ships with; the
-// quadrant scatter cannot, since rent and crime raw areas are different
-// geographies and a point needs both.
-const GRAN_NOTE = {
+// One control for "what am I looking at". The level and the region were two
+// questions with one honest answer between them: you are either seeing all of
+// Auckland at region level, or you are inside a region seeing its suburbs. So
+// they share a dropdown, with the regions grouped under it.
+const AREA_NOTE = {
   region: 'Six compass regions, drawn as solid blocks.',
   suburb: 'LINZ suburbs of urban Auckland.',
   raw: 'The boundaries each dataset ships with.',
 };
+
+function setArea(value) {
+  if (value.startsWith('in:')) setGranularity('suburb', value.slice(3));
+  else setGranularity(value);
+}
+
+// The current state as a dropdown value. Clicking the map can put us in states
+// the dropdown has no option for — one suburb selected, say — in which case the
+// nearest enclosing option stays chosen.
+function areaValue() {
+  if (granularity === 'raw') return 'raw';
+  if (granularity === 'region') return 'region';
+  return scope && REGION_SUBURBS[scope] ? 'in:' + scope : 'suburb';
+}
+
+function syncAreaSelect() {
+  const sel = document.getElementById('area-select');
+  const raw = GRAN_STOPS.includes('raw');
+  const rawN = mapMode === 'safety' ? Object.keys(RAW_AREAS.crime).length
+                                    : Object.keys(RAW_AREAS.rent).length;
+  sel.innerHTML =
+      `<option value="region">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
+    + `<option value="suburb">All suburbs \u00B7 ${SUBURB_DATA.length}</option>`
+    + '<optgroup label="Inside one region">'
+    + REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r =>
+        `<option value="in:${r}">${r} \u00B7 ${REGION_SUBURBS[r].length} `
+        + `suburb${REGION_SUBURBS[r].length === 1 ? '' : 's'}</option>`).join('')
+    + '</optgroup>'
+    + (raw ? `<option value="raw">Source areas \u00B7 ${rawN}</option>` : '');
+  sel.value = areaValue();
+  document.getElementById('gran-note').textContent =
+    granularity === 'suburb' && scope ? `The ${scope} region, suburb by suburb.`
+                                      : AREA_NOTE[granularity];
+}
+
+// The ranking views can drop to the boundaries each dataset ships with; the
+// combined view cannot, since rent and crime raw areas are different
+// geographies and a point needs both.
 function syncGranStops() {
-  const raw = mapMode !== 'combined';
-  GRAN_STOPS = raw ? ['region','suburb','raw'] : ['region','suburb'];
-  const count = {
-    region: Object.keys(REGION_SUBURBS).length,
-    suburb: SUBURB_DATA.length,
-    raw: mapMode === 'safety' ? Object.keys(RAW_AREAS.crime).length
-                              : Object.keys(RAW_AREAS.rent).length,
-  };
-  const label = { region: 'Regions', suburb: 'Suburbs', raw: 'Source areas' };
-  const sel = document.getElementById('gran-select');
-  sel.innerHTML = GRAN_STOPS
-    .map(g => `<option value="${g}">${label[g]} \u00B7 ${count[g]}</option>`).join('');
+  GRAN_STOPS = mapMode === 'combined' ? ['region','suburb'] : ['region','suburb','raw'];
   if (!GRAN_STOPS.includes(granularity)) { setGranularity('suburb'); return; }
-  sel.value = granularity;
+  syncAreaSelect();
 }
 
 // Five region centroids sit far wider apart than 62 suburb markers, so a view
