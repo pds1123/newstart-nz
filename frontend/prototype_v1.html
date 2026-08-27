@@ -1834,17 +1834,13 @@ function setGranularity(g, into) {
 // inside a suburb — 74 of the 123 suburbs that carry both are built from a
 // different NUMBER of source areas on each side. There is no row that could
 // honestly hold a rent figure and a crime figure at once, so the reader picks.
-const AREA_NOTE = {
-  region: 'Six compass regions, drawn as solid blocks.',
-  suburb: 'Every LINZ suburb of urban Auckland.',
-};
+const AREA_NOTE = { region: 'Six compass regions, drawn as solid blocks.' };
 const REGION_OF = Object.fromEntries(SUBURB_DATA.map(d => [d.suburb, d.region]));
 let sourceView = null;    // null | 'rent' | 'crime' — the third level
 
 function setRegion(r) {
   sourceView = null;
   if (r === 'regions') setGranularity('region');
-  else if (r === 'suburbs') setGranularity('suburb');
   else setGranularity('suburb', r);
 }
 
@@ -1871,17 +1867,19 @@ function setSource(v) {
 // select goes dead until one suburb is open.
 function syncAreaSelects() {
   const rsel = document.getElementById('region-select');
+  // Strictly a hierarchy: Auckland has six regions, a region has its suburbs,
+  // a suburb has its source areas. There is deliberately no "all 172 suburbs"
+  // stop — 172 markers on one map, and 143 rows in each ranking, is more than
+  // anyone reads, and it is the one option that was a level rather than a place.
   rsel.innerHTML =
       `<option value="regions">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
-    + `<option value="suburbs">All Auckland \u00B7 ${SUBURB_DATA.length} suburbs</option>`
     + '<optgroup label="Inside one region">'
     + REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r => {
         const n = REGION_SUBURBS[r].length;
         return `<option value="${r}">${r} \u00B7 ${n} suburb${n === 1 ? '' : 's'}</option>`;
       }).join('')
     + '</optgroup>';
-  rsel.value = granularity === 'region' ? 'regions'
-             : (scope && REGION_SUBURBS[scope]) ? scope : 'suburbs';
+  rsel.value = granularity === 'suburb' && REGION_SUBURBS[scope] ? scope : 'regions';
 
   const ssel = document.getElementById('suburb-select');
   const atRegion = granularity === 'region';
@@ -1907,8 +1905,7 @@ function syncAreaSelects() {
   document.getElementById('gran-note').textContent =
     atRegion ? AREA_NOTE.region
     : selected ? `${selected}, in ${REGION_OF[selected]}.`
-    : scope && REGION_SUBURBS[scope] ? `The ${scope} region, suburb by suburb.`
-    : AREA_NOTE.suburb;
+    : `The ${scope} region, suburb by suburb.`;
 }
 
 
@@ -1946,7 +1943,7 @@ function refresh() {
     const members = REGION_SUBURBS[scope];
     UNITS = SUBURB_DATA.filter(d => members.includes(d.suburb));
   } else {
-    UNITS = SUBURB_DATA;
+    UNITS = SUBURB_DATA;   // unreachable from the UI; every suburb view is scoped
   }
   computeMedians();
   computeBivCuts();
@@ -2052,12 +2049,9 @@ function onSearchFocus() {
 }
 function selectFromSearch(name) {
   clearSearch();
-  // Results are suburbs, so drop to that granularity before selecting.
-  if (granularity === 'region') setGranularity('suburb');
-  selected = name;
-  const m = markers[name];
-  if (m) map.setView([m.data.lat, m.data.lng], 14, { animate: true });
-  buildMarkers(); drawChart();
+  // Same path as picking from the dropdowns: scope to the suburb's own region
+  // first, so the ladder and the map end up where the selection says they are.
+  setSuburbFilter(name);
 }
 function clearSearch() {
   document.getElementById('search-input').value = '';
