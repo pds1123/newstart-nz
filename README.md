@@ -58,10 +58,3 @@ the API currently serves.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — data pipeline, mapping layer, data model,
   frontend structure, and the full list of limitations
 - [docs/DEVLOG.md](docs/DEVLOG.md) — 开发日志：踩过的坑和当时的决策理由
-
-## Known gaps
-
-- **Arch Hill** and **Flat Bush** have no rent or crime data — neither appears in the
-  source datasets under a matching area name.
-- Crime and rent boundaries only approximate each other; suburb-level figures are
-  indicative rather than exact.
