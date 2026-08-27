@@ -34,8 +34,23 @@ report and saved to `data/`:
 
 Set **Region** to `Auckland Region`, **Territorial Authority** to `Auckland`, and
 **Boundary to display** to `Area Unit` — the mapping table is built against area units, so
-any other boundary will not join. Export from the *Download* tab as a crosstab CSV, then
-reshape to `suburb,total_crimes_2025`. Note that the report excludes victim demographics,
+any other boundary will not join.
+
+Then take the **Data** download, not Crosstab. Crosstab exports the table as displayed,
+which on this dashboard is an hour-by-weekday grid with no geography in it at all. Select
+the **Table ST** worksheet, open the data window, switch to its **Full Data** tab and
+download from there. A correct export is named `Table ST_..._data.csv` and has three
+columns: `Area Unit`, `Year Month`, `Number of Victimisations`.
+
+That file needs three fixes before it will join:
+
+- It is **UTF-16 encoded and tab-separated**, not UTF-8 CSV
+- Area unit names carry a **trailing full stop** (`Inlet-Waitemata Harbour.`)
+- Summing by area unit yields 416 areas; **11 are water or islands** and are dropped
+  (Auckland City-Marinas, Auckland Harbourside, Bays-Waiheke Island, the four Inlet-*
+  and Tidal-* entries, Oceanic-Auckland Region East, Tamaki Strait, Waiheke Island)
+
+Aggregate to `suburb,total_crimes_2025`. Note the report excludes victim demographics,
 homicides, and non-burglary victimisations occurring in dwellings, so counts sit below the
 true totals by design.
 
