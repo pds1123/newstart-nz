@@ -224,11 +224,17 @@ input[type=range]::-webkit-slider-thumb {
 .panel-map     { flex: 1 1 65%; }
 .panel + .panel { border-left: 1px solid var(--border); }
 .panel-head {
-  height: 42px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+  height: 42px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; overflow: hidden;
   padding: 0 14px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .panel-title { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
-.panel-sub { font-size: 11px; color: var(--faint); }
+.panel-sub { font-size: 11px; color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-tabs { margin-left: auto; flex-shrink: 0; display: flex; gap: 2px; background: var(--bg); border-radius: var(--radius-sm); padding: 3px; }
+.chart-tab {
+  padding: 3px 9px; border-radius: 5px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; border: none; background: none; color: var(--muted); white-space: nowrap;
+}
+.chart-tab.active { background: var(--surface); color: var(--green-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .panel-body { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 
 /* View toggle — lives in the toolbar spanning both panels */
@@ -455,6 +461,11 @@ input[type=range]::-webkit-slider-thumb {
         <div class="panel-head">
           <span class="panel-title" id="chart-title">Rent vs Safety</span>
           <span class="panel-sub" id="scatter-sub"></span>
+          <div class="chart-tabs" id="chart-tabs">
+            <button class="chart-tab active" data-tab="overview" onclick="setChartTab('overview')">Overview</button>
+            <button class="chart-tab" data-tab="spread" onclick="setChartTab('spread')">Spread</button>
+            <button class="chart-tab" data-tab="beds" onclick="setChartTab('beds')">Bedrooms</button>
+          </div>
         </div>
         <div class="panel-body" id="chart-body">
           <svg id="scatter"></svg>
@@ -606,7 +617,8 @@ const units = () => UNITS;
 let currentBed   = '2';
 let currentDwell = 'All';
 let currentBudget = 650;
-let mapMode = 'compare';   // 'compare' | 'rent' | 'safety'
+let mapMode = 'compare';    // 'compare' | 'rent' | 'safety'
+let chartTab = 'overview';  // 'overview' | 'spread' | 'beds'
 let sortKey = 'score', sortDir = -1;
 let selected = null;
 let markers = {};
@@ -950,13 +962,27 @@ function el(tag, attrs, text) {
 // Dispatcher: quadrant mode gets the scatter, single-metric modes get bars.
 function drawChart() {
   const body = document.getElementById('chart-body');
-  if (mapMode === 'compare') {
-    body.classList.remove('scrolling');
-    drawScatter();
-  } else {
-    body.classList.add('scrolling');
-    drawBars();
-  }
+  // The raw stop shows source areas that the other two tabs cannot describe —
+  // they aggregate suburbs — so it keeps the overview only.
+  if (granularity === 'raw') chartTab = 'overview';
+  syncChartTitle();
+  document.getElementById('chart-tabs').style.display = granularity === 'raw' ? 'none' : '';
+  document.querySelectorAll('.chart-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === chartTab));
+  const scrolls = chartTab === 'overview' && mapMode !== 'compare';
+  body.classList.toggle('scrolling', scrolls);
+  if (chartTab === 'spread')      drawSpread();
+  else if (chartTab === 'beds')   drawBeds();
+  else if (mapMode === 'compare') drawScatter();
+  else                            drawBars();
+}
+function setChartTab(t) { chartTab = t; drawChart(); }
+function syncChartTitle() {
+  document.getElementById('chart-title').textContent =
+    chartTab === 'spread' ? (mapMode === 'safety' ? 'Safety spread' : 'Rent spread')
+    : chartTab === 'beds' ? 'Rent by bedrooms'
+    : mapMode === 'rent' ? 'Rent ranking'
+    : mapMode === 'safety' ? 'Safety ranking' : 'Rent vs Safety';
 }
 
 function drawScatter() {
@@ -1102,10 +1128,274 @@ function rawBarRows(isRent) {
   return rows.sort((a, b) => a.v - b.v);
 }
 
+// ── SPREAD: where the whole city sits ──
+// A ranking answers "which suburb is cheapest". It cannot answer "is $650 a
+// generous budget or a tight one", because that needs the shape of the whole
+// distribution, not the order. This histogram is that shape.
+function drawSpread() {
+  const svg = document.getElementById('scatter');
+  const box = svg.parentElement.getBoundingClientRect();
+  const W = Math.max(320, box.width), H = Math.max(240, box.height);
+  svg.style.height = '';
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const isRent = mapMode !== 'safety';
+  const rows = units()
+    .map(d => ({ d, v: isRent ? getRent(d) : getCrimeRate(d) }))
+    .filter(r => r.v != null);
+  if (rows.length < 2) {
+    svg.appendChild(el('text', { x: W/2, y: H/2, 'text-anchor': 'middle', class: 'sc-tick' },
+      'Not enough data at this filter'));
+    return;
+  }
+
+  const vals = rows.map(r => r.v).sort((a, b) => a - b);
+  const p95 = vals[Math.floor(vals.length * 0.95)];
+  // Auckland's 2-bedroom medians all sit between $400 and $800, so starting the
+  // axis at zero would spend half the width on empty bins and leave the actual
+  // spread four bars wide. Frame the occupied range instead.
+  const binW = niceBin((p95 - vals[0]) / 24);
+  const lo = Math.floor(vals[0] / binW) * binW;
+  const hi = Math.ceil(p95 / binW) * binW;
+  const nBins = Math.max(1, Math.round((hi - lo) / binW));
+  const bins = Array.from({ length: nBins }, () => []);
+  rows.forEach(r => bins[Math.min(nBins - 1, Math.max(0, Math.floor((r.v - lo) / binW)))].push(r));
+  const tickStep = niceBin((hi - lo) / 5);
+
+  const pad = { l: 40, r: 16, t: 46, b: 46 };
+  const x0 = pad.l, x1 = W - pad.r, y0 = pad.t, y1 = H - pad.b;
+  const maxN = Math.max(...bins.map(b => b.length));
+  const sx = v => x0 + (v - lo) / (hi - lo) * (x1 - x0);
+  const sy = n => y1 - n / maxN * (y1 - y0);
+
+  for (let n = 0; n <= maxN; n += Math.max(1, Math.ceil(maxN / 4))) {
+    svg.appendChild(el('line', { x1: x0, y1: sy(n), x2: x1, y2: sy(n), class: 'sc-grid' }));
+    svg.appendChild(el('text', { x: x0 - 7, y: sy(n) + 3, 'text-anchor': 'end', class: 'sc-tick' }, n));
+  }
+
+  const bw = (x1 - x0) / nBins;
+  bins.forEach((b, i) => {
+    if (!b.length) return;
+    const bx = x0 + i * bw, mid = lo + (i + 0.5) * binW;
+    const holdsSel = selected && b.some(r => r.d.suburb === selected);
+    const g = el('g', {});
+    g.appendChild(el('rect', {
+      x: bx + 1, y: sy(b.length), width: Math.max(1, bw - 2), height: y1 - sy(b.length),
+      fill: isRent ? rentColor(mid) : safetyColor(mid),
+      stroke: holdsSel ? '#0F1C18' : 'none', 'stroke-width': 1.5,
+    }));
+    const overflow = i === nBins - 1 && b.some(r => r.v > hi);
+    g.appendChild(el('title', {},
+      `${isRent ? '$' : ''}${Math.round(lo + i * binW)}${overflow ? ' and above' : '–' + Math.round(lo + (i + 1) * binW)}`
+      + `  ·  ${b.length} ${b.length === 1 ? 'suburb' : 'suburbs'}\n`
+      + b.slice(0, 12).map(r => r.d.suburb).join(', ') + (b.length > 12 ? ', …' : '')));
+    // The final bin catches everything past the 95th percentile, so say so
+    // rather than let it read as one more equal-width step.
+    if (overflow) {
+      g.appendChild(el('text', {
+        x: bx + bw / 2, y: sy(b.length) - 5, 'text-anchor': 'middle',
+        class: 'sc-tick', 'font-weight': 700,
+      }, '+'));
+    }
+    svg.appendChild(g);
+  });
+
+  for (let v = Math.ceil(lo / tickStep) * tickStep; v <= hi; v += tickStep) {
+    svg.appendChild(el('text', { x: sx(v), y: y1 + 15, 'text-anchor': 'middle', class: 'sc-tick' },
+      isRent ? '$' + v : v.toLocaleString()));
+  }
+  svg.appendChild(el('text', { x: (x0 + x1) / 2, y: H - 8, 'text-anchor': 'middle', class: 'sc-axis-label' },
+    isRent ? 'Weekly rent ($)' : 'Victimisations per 1,000 residents'));
+
+  // Reference lines: the city median, and whatever the reader set as a budget.
+  // Budget and median routinely land within a few dollars of each other, so the
+  // labels stack on separate lines rather than trying to share one.
+  let ruleRow = 0;
+  const rule = (v, colour, dash, text) => {
+    if (v == null || v < lo || v > hi) return;
+    const ty = y0 - 26 + (ruleRow++ % 2) * 13;
+    svg.appendChild(el('line', {
+      x1: sx(v), y1: ty + 3, x2: sx(v), y2: y1, stroke: colour,
+      'stroke-width': 1.5, 'stroke-dasharray': dash,
+    }));
+    const anchor = sx(v) > x1 - 70 ? 'end' : 'start';
+    svg.appendChild(el('text', {
+      x: sx(v) + (anchor === 'end' ? -5 : 5), y: ty, 'text-anchor': anchor,
+      class: 'sc-tick', fill: colour, 'font-weight': 700,
+    }, text));
+  };
+  if (isRent) rule(currentBudget, '#E24B4A', '0', 'your budget');
+  rule(vals[Math.floor(vals.length / 2)], '#7C7669', '3 3', 'median');
+
+  const under = isRent ? vals.filter(v => v <= currentBudget).length : null;
+  document.getElementById('scatter-sub').textContent =
+    `${rows.length} ${granularity === 'region' ? 'regions' : 'suburbs'}`
+    + (scope ? ` in ${scope}` : '')
+    + (isRent ? ` · ${under} within $${currentBudget}` : ' · 95th percentile shown');
+}
+
+// ── BEDROOMS: what another room costs ──
+// The filters let you pick one bedroom count and one dwelling type, so the map
+// only ever shows a single cell of a 5x5 grid. This draws the grid's rows as
+// lines, which is the only view that answers "should I take a flatmate".
+const DWELL_COLOUR = { 'House': '#1D9E75', 'Apartment': '#5B8DEF', 'Flat': '#EF9F27' };
+const BED_STOPS = ['1', '2', '3', '4'];
+
+// Bond-weighted, so a suburb with 300 lodged bonds outweighs one with 4.
+// Thin cells are dropped rather than plotted: only two suburbs report a 4-bed
+// apartment, between them 48 bonds, and their $312 median would draw a cliff
+// suggesting a four-bedroom apartment is cheaper than a studio. A cell has to
+// carry at least 3% of its dwelling type's busiest bedroom count to be shown.
+function bedSeries(pool) {
+  const raw = {};
+  for (const dw in DWELL_COLOUR) {
+    raw[dw] = BED_STOPS.map(b => {
+      let wsum = 0, med = 0, lq = 0, uq = 0;
+      pool.forEach(d => {
+        const c = ((d.rent || {})[dw] || {})[b];
+        if (!c || c[RENT_MED] == null) return;
+        const w = c[RENT_N] || 1;
+        med += c[RENT_MED] * w;
+        lq  += (c[RENT_LQ] != null ? c[RENT_LQ] : c[RENT_MED]) * w;
+        uq  += (c[RENT_UQ] != null ? c[RENT_UQ] : c[RENT_MED]) * w;
+        wsum += w;
+      });
+      return wsum ? { bed: b, n: wsum, v: Math.round(med / wsum),
+                      lq: Math.round(lq / wsum), uq: Math.round(uq / wsum) } : null;
+    }).filter(Boolean);
+  }
+  const out = {}; let dropped = 0;
+  for (const dw in raw) {
+    const floor = Math.max(15, Math.max(0, ...raw[dw].map(p => p.n)) * 0.03);
+    const keep = raw[dw].filter(p => p.n >= floor);
+    dropped += raw[dw].length - keep.length;
+    if (keep.length) out[dw] = keep;
+  }
+  return { series: out, dropped };
+}
+
+// Room and boarding-house listings are priced per room, so they cannot share a
+// bedroom axis with whole dwellings. They get a one-line footnote instead.
+function sharedNote(pool) {
+  const parts = SHARED.map(dw => {
+    let wsum = 0, med = 0;
+    pool.forEach(d => {
+      const c = ((d.rent || {})[dw] || {})['1'];
+      if (!c || c[RENT_MED] == null) return;
+      const w = c[RENT_N] || 1;
+      med += c[RENT_MED] * w; wsum += w;
+    });
+    return wsum ? `${dw.toLowerCase()} $${Math.round(med / wsum)}` : null;
+  }).filter(Boolean);
+  return parts.length ? `Per room: ${parts.join(' · ')}` : '';
+}
+
+function drawBeds() {
+  const svg = document.getElementById('scatter');
+  const box = svg.parentElement.getBoundingClientRect();
+  const W = Math.max(320, box.width), H = Math.max(240, box.height);
+  svg.style.height = '';
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const sel = selected && units().find(d => d.suburb === selected);
+  const pool = sel ? [sel] : units();
+  const { series, dropped } = bedSeries(pool);
+  const names = Object.keys(series);
+  const where = sel ? sel.suburb : (scope || 'All Auckland');
+  if (!names.length) {
+    svg.appendChild(el('text', { x: W/2, y: H/2, 'text-anchor': 'middle', class: 'sc-tick' },
+      `No rent data for ${where}`));
+    document.getElementById('scatter-sub').textContent = where;
+    return;
+  }
+
+  const pad = { l: 46, r: 92, t: 24, b: 48 };
+  const x0 = pad.l, x1 = W - pad.r, y0 = pad.t, y1 = H - pad.b;
+  const hi = niceCeil(Math.max(...names.flatMap(dw => series[dw].map(p => p.uq))));
+  const sx = b => x0 + (BED_STOPS.indexOf(b) / (BED_STOPS.length - 1)) * (x1 - x0);
+  const sy = v => y1 - v / hi * (y1 - y0);
+
+  for (let v = 0; v <= hi; v += niceStep(hi)) {
+    svg.appendChild(el('line', { x1: x0, y1: sy(v), x2: x1, y2: sy(v), class: 'sc-grid' }));
+    svg.appendChild(el('text', { x: x0 - 7, y: sy(v) + 3, 'text-anchor': 'end', class: 'sc-tick' }, '$' + v));
+  }
+  BED_STOPS.forEach(b => svg.appendChild(el('text', {
+    x: sx(b), y: y1 + 16, 'text-anchor': 'middle', class: 'sc-tick',
+  }, b === '4' ? '4+ bed' : b + ' bed')));
+
+  // Ribbons first, so the median lines read on top of their own spread.
+  names.forEach(dw => {
+    const pts = series[dw];
+    if (pts.length < 2) return;
+    svg.appendChild(el('polygon', {
+      points: pts.map(p => `${sx(p.bed)},${sy(p.uq)}`).join(' ') + ' ' +
+              pts.slice().reverse().map(p => `${sx(p.bed)},${sy(p.lq)}`).join(' '),
+      fill: DWELL_COLOUR[dw], 'fill-opacity': 0.12,
+    }));
+  });
+
+  names.forEach(dw => {
+    const pts = series[dw], colour = DWELL_COLOUR[dw];
+    if (pts.length > 1) {
+      svg.appendChild(el('polyline', {
+        points: pts.map(p => `${sx(p.bed)},${sy(p.v)}`).join(' '),
+        fill: 'none', stroke: colour, 'stroke-width': 2,
+        'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      }));
+    }
+    pts.forEach(p => {
+      const c = el('circle', { cx: sx(p.bed), cy: sy(p.v), r: 4, fill: colour,
+                               stroke: '#fff', 'stroke-width': 1.5 });
+      c.appendChild(el('title', {},
+        `${dw} · ${p.bed === '4' ? '4+' : p.bed} bed\n`
+        + `$${p.v}/wk  ·  quartiles ${p.lq}–${p.uq}\n`
+        + `${p.n.toLocaleString()} active bonds`));
+      svg.appendChild(c);
+    });
+    // Label at the line's end rather than in a legend box, so the eye does not
+    // have to travel to find out which line is which.
+    const last = pts[pts.length - 1];
+    svg.appendChild(el('text', {
+      x: sx(last.bed) + 8, y: sy(last.v) + 3, class: 'sc-tick',
+      fill: colour, 'font-weight': 700,
+    }, dw));
+  });
+
+  const house = series['House'];
+  const step = house && house.length > 1
+    ? Math.round((house[house.length - 1].v - house[0].v)
+                 / (+house[house.length - 1].bed - +house[0].bed))
+    : null;
+  document.getElementById('scatter-sub').textContent = where;
+  if (step) {
+    svg.appendChild(el('text', { x: x0, y: 14, class: 'sc-axis-label', fill: DWELL_COLOUR['House'] },
+      `\u2248 $${step} per extra bedroom`));
+  }
+
+  // Caveats sit under the plot, where they are read alongside it rather than
+  // squeezed into the panel header.
+  const caption = [
+    sharedNote(pool),
+    dropped ? `${dropped} thin ${dropped === 1 ? 'cell' : 'cells'} hidden` : '',
+  ].filter(Boolean).join('   ·   ');
+  if (caption) {
+    svg.appendChild(el('text', { x: x0, y: H - 8, class: 'sc-tick' }, caption));
+  }
+}
+
 // Round an axis maximum up to something a reader can hold in their head.
 function niceCeil(v) {
   const mag = Math.pow(10, Math.floor(Math.log10(v)));
   return Math.ceil(v / (mag / 2)) * (mag / 2);
+}
+// Bin and tick widths a person reads without decoding: 1, 2, 2.5, 5 x 10^n.
+function niceBin(raw) {
+  const mag = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-9))));
+  return ([1, 2, 2.5, 5].map(m => m * mag).find(s => s >= raw) || mag * 10);
 }
 function niceStep(max) {
   const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -1460,8 +1750,6 @@ function setMapMode(m) {
   document.getElementById('btn-quad').classList.toggle('active', m==='quadrant');
   document.getElementById('btn-rent').classList.toggle('active', m==='rent');
   document.getElementById('btn-safety').classList.toggle('active', m==='safety');
-  document.getElementById('chart-title').textContent =
-    m === 'rent' ? 'Rent ranking' : m === 'safety' ? 'Safety ranking' : 'Rent vs Safety';
   refresh();   // medians and KPIs depend on granularity, which this may have changed
   document.getElementById('q-legend-section').style.display =
     m === 'compare' ? '' : 'none';
