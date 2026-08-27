@@ -9,14 +9,14 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
+| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter, and the source areas inside one suburb |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
 | `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
 | `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |
 | `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
-| `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json` (and `raw_areas.json`, kept for auditing the fold) |
+| `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json`, `source_areas.json` (the fold, per suburb) and `raw_areas.json` |
 | `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML pages |
 | `scraper/test_mbie_api.py` | Probe for what the API currently serves |
 
@@ -41,9 +41,16 @@ CC BY 4.0.*
 
 The three datasets use different geographic boundaries, so `rent_area_mapping_linz.csv` and
 `crime_area_mapping_linz.csv` fold 548 rent source areas and 405 police source areas onto
-the 172 LINZ suburbs of urban Auckland. Coverage: 149/172 have rent figures, 114/172 have
+the 172 LINZ suburbs of urban Auckland. Coverage: 153/172 have rent figures, 123/172 have
 crime counts, 170/172 have population. Suburbs with no data are shown as such rather than
 dropped.
+
+Those folds are not tidy, so the page lets you open one up. Picking a suburb and then a
+dataset lists the source areas behind its figure: Glen Innes reads $517 for a 2-bedroom
+house, which is $194 in one MBIE area and $618 in the other. The two datasets have to be
+viewed one at a time, because 74 of the 123 suburbs carrying both are built from a
+different *number* of source areas on each side — there is no row that could honestly hold
+a rent figure and a crime figure together.
 
 ## Running the scraper
 

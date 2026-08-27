@@ -14,16 +14,17 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(REPO, "data")
 
 TARGETS = {
-    "frontend/prototype_v1.html": ["SUBURB_DATA", "SUBURB_GEO"],
+    "frontend/prototype_v1.html": ["SUBURB_DATA", "SUBURB_GEO", "SOURCE_AREAS"],
     "frontend/auckland_map.html": ["SUBURB_DATA"],
 }
 
 # raw_areas.json is still built — it records how each source area folds onto a
-# suburb, which is worth keeping auditable — but the page no longer shows the
-# source boundaries, so it is not inlined.
+# suburb, which is worth keeping auditable — but the page reads the same data
+# turned inside out, from source_areas.json, so raw_areas is not inlined.
 SOURCES = {
     "SUBURB_DATA": os.path.join(DATA, "suburbs.json"),
     "SUBURB_GEO": os.path.join(DATA, "linz_suburbs.geojson"),
+    "SOURCE_AREAS": os.path.join(DATA, "source_areas.json"),
 }
 
 # A JSON array opens with [ and an object with {; match whichever this const holds.

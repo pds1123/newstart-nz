@@ -136,12 +136,36 @@ def main():
     json.dump(raw, open(os.path.join(DATA, "raw_areas.json"), "w"),
               separators=(",", ":"), ensure_ascii=False)
 
+    # The same source areas, turned inside out: keyed by the suburb they fold
+    # into, carrying only the mapped ones. This is what the page shows when a
+    # reader opens one suburb. It has to be per-dataset, because the two use
+    # different geographies — 74 of the 123 suburbs that have both are built
+    # from a different NUMBER of source areas on each side, so there is no row
+    # that could honestly carry a rent figure and a crime figure together.
+    inside = {}
+    for name in sorted(set(rent_map) | set(crime_map)):
+        rec = {}
+        r = [[a, by_area[a]] for a in sorted(rent_map.get(name, [])) if a in by_area]
+        c = [[a, crime_raw[a]] for a in sorted(crime_map.get(name, [])) if a in crime_raw]
+        if r:
+            rec["r"] = r
+        if c:
+            rec["c"] = c
+        if rec:
+            inside[name] = rec
+    json.dump(inside, open(os.path.join(DATA, "source_areas.json"), "w"),
+              separators=(",", ":"), ensure_ascii=False)
+
     have_rent = sum(1 for s in suburbs if any(s["rent"][d] for d in DWELLS))
     have_crime = sum(1 for s in suburbs if s["crime_2025"] is not None)
     have_pop = sum(1 for s in suburbs if s["population"])
     print(f"suburbs.json  : {len(suburbs)} suburbs "
           f"({have_rent} with rent, {have_crime} with crime, {have_pop} with population)")
     print(f"raw_areas.json: {len(raw['rent'])} rent areas, {len(raw['crime'])} police areas")
+    multi_r = sum(1 for v in inside.values() if len(v.get("r", [])) > 1)
+    multi_c = sum(1 for v in inside.values() if len(v.get("c", [])) > 1)
+    print(f"source_areas.json: {len(inside)} suburbs "
+          f"({multi_r} built from 2+ rent areas, {multi_c} from 2+ police areas)")
 
 
 if __name__ == "__main__":
