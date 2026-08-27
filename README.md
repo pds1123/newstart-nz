@@ -9,7 +9,7 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Main dashboard — ward/suburb granularity, quadrant scatter, rent & safety rankings |
+| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rankings, spread, region comparison, scatter, rent by bedrooms |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
@@ -26,7 +26,8 @@ All frontend files are standalone HTML — open one in a browser, no build step.
 
 **Rent** — [MBIE Market Rent API v2](https://api.business.govt.nz/) (Tenancy Services),
 pulled by `scraper/fetch_rent.py`. Statistical area unit and ward level, 12 months ending
-June 2026 (covers 2025-07-01 to 2026-06-30). Values shown are medians.
+June 2026 (covers 2025-07-01 to 2026-06-30). Both the median and the mean are
+carried, along with the lower and upper quartiles and the active bond count.
 
 **Crime** — NZ Police [*Victimisations Time and Place*](https://public.tableau.com/views/VictimisationsTimeandPlace/Summary),
 exported by hand at area-unit level for calendar 2025. The export has a few traps in it —

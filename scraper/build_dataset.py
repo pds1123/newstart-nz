@@ -56,7 +56,7 @@ def main():
     geo = json.load(open(SUBURBS_GEO))
 
     def aggregate(suburb, dwell, bed):
-        """Returns [median, lower quartile, upper quartile, bonds] or None.
+        """Returns [median, lower quartile, upper quartile, bonds, mean] or None.
 
         The quartiles are what a suburb median alone cannot say: how much the
         rents inside it actually vary. A wide spread is also a warning sign —
@@ -80,7 +80,11 @@ def main():
 
         med = avg("med")
         n = sum(int(r["nCurr"]) for r in rows if r["nCurr"] not in ("", "NA"))
-        return [med, avg("lq"), avg("uq"), n]
+        # The mean rides along beside the median because the two disagree in a
+        # way that is itself information: where a suburb pools social and market
+        # housing, or a few very expensive listings sit in a cheap area, the mean
+        # runs well above the median. Equal values mean a symmetric market.
+        return [med, avg("lq"), avg("uq"), n, avg("mean")]
 
     suburbs = []
     for feat in geo["features"]:
@@ -101,7 +105,7 @@ def main():
             "region": p["region"],
             "population": p["population"],
             "crime_2025": crime,
-            "rent": rent,        # dwell -> bed -> [median, lq, uq, bonds]
+            "rent": rent,        # dwell -> bed -> [median, lq, uq, bonds, mean]
         })
 
     json.dump(suburbs, open(os.path.join(DATA, "suburbs.json"), "w"),
@@ -120,7 +124,8 @@ def main():
         n = int(r["nCurr"]) if r["nCurr"] not in ("", "NA") else 0
         lq = int(float(r["lq"])) if r["lq"] not in ("", "NA") else None
         uq = int(float(r["uq"])) if r["uq"] not in ("", "NA") else None
-        by_area[r["area"].strip()][r["dwell"]][r["nBedrms"]] = [int(float(r["med"])), lq, uq, n]
+        mean = int(float(r["mean"])) if r["mean"] not in ("", "NA") else None
+        by_area[r["area"].strip()][r["dwell"]][r["nBedrms"]] = [int(float(r["med"])), lq, uq, n, mean]
 
     raw = {
         "rent": {a: {"v": dict(v), "s": rent_parent.get(a)}
