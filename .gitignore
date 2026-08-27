@@ -29,3 +29,6 @@ tmp/
 
 # Local dev scaffolding (absolute paths, not portable)
 .claude/
+
+# Local notes, not published
+docs/

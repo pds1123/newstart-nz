@@ -62,9 +62,3 @@ python3 scraper/fetch_rent.py 2026-06 && python3 scraper/build_dataset.py 2026_0
 `fetch_rent.py` takes about a minute — the SAU request is large. The available
 period window moves, so run `python3 scraper/test_mbie_api.py` first to see what
 the API currently serves.
-
-## Documentation
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — data pipeline, mapping layer, data model,
-  frontend structure, and the full list of limitations
-- [docs/DEVLOG.md](docs/DEVLOG.md) — 开发日志：踩过的坑和当时的决策理由

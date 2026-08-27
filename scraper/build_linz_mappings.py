@@ -50,13 +50,28 @@ def norm(s):
     return "".join(ch for ch in s if ch.isalnum())
 
 
-def strip_dir(s):
-    """`Mount Eden West` -> `Mount Eden`, `Hillsborough (Auckland)` -> `Hillsborough`."""
-    t = re.sub(r"\s*\((auckland|akl)\)$", "", s, flags=re.I)
-    t = re.sub(r"[-–].*$", "", t)                     # `Glen Innes East-Wai O Taiki Bay`
-    for _ in range(2):                                 # `Epsom Central-North`
+def stems(s):
+    """Progressively shorter forms of a source-area name, longest first.
+
+    Order matters. `Te Atatu South-Central` must be tried as `Te Atatu South`
+    before the direction strip reduces it to `Te Atatu`, which is not a suburb.
+    Callers take the first form that matches, so a shorter stem is only reached
+    when every longer one failed.
+    """
+    out = []
+    t = re.sub(r"\s*\((auckland|akl)\)$", "", s, flags=re.I).strip()
+    out.append(t)
+    t = re.sub(r"[-–].*$", "", t).strip()              # `Te Atatu South-Central`
+    out.append(t)
+    for _ in range(2):                                 # `Mount Eden West`
         t = re.sub(r"\s+" + DIRS + r"\s*$", "", t, flags=re.I).strip()
-    return t
+        out.append(t)
+    seen, uniq = set(), []
+    for x in out:
+        if x and x not in seen:
+            seen.add(x)
+            uniq.append(x)
+    return uniq
 
 
 def build(source_names, old_path, out_path, linz):
@@ -66,16 +81,21 @@ def build(source_names, old_path, out_path, linz):
     rows = []
     for name in sorted(source_names):
         target = via = None
-        if norm(name) in by_norm:
-            target, via = by_norm[norm(name)], "exact"
-        elif name in MANUAL:
+        prev = old.get(name, {})
+        if name in MANUAL:
             target, via = MANUAL[name], "manual"
         else:
-            prev = old.get(name, {})
-            if prev.get("status") == "mapped" and norm(prev["master_suburb"]) in by_norm:
+            # The name's own stem wins over the previous table. `Mt Wellington
+            # North` names its suburb outright; the old table sent it to Penrose
+            # only because Mount Wellington was not on the 62-suburb list.
+            for i, stem in enumerate(stems(name)):
+                if norm(stem) in by_norm:
+                    target = by_norm[norm(stem)]
+                    via = "exact" if i == 0 else "stem"
+                    break
+            if not target and prev.get("status") == "mapped" \
+                    and norm(prev["master_suburb"]) in by_norm:
                 target, via = by_norm[norm(prev["master_suburb"])], "previous-mapping"
-            elif norm(strip_dir(name)) in by_norm:
-                target, via = by_norm[norm(strip_dir(name))], "strip-direction"
 
         if target:
             rows.append({"source_area": name, "linz_suburb": target,
