@@ -56,10 +56,15 @@ def main():
     geo = json.load(open(SUBURBS_GEO))
 
     def aggregate(suburb, dwell, bed):
-        """Unweighted mean of the member areas' medians, plus their total bonds.
+        """Returns [median, lower quartile, upper quartile, bonds] or None.
 
-        Unweighted is a simplification — a source area with 4 bonds counts as
-        much as one with 400. Weighting by nCurr would be more defensible.
+        The quartiles are what a suburb median alone cannot say: how much the
+        rents inside it actually vary. A wide spread is also a warning sign —
+        Glen Innes runs $127 to $640 for the same dwelling because market and
+        income-related social housing rents are pooled together.
+
+        Each is an unweighted mean across the member source areas, which is a
+        simplification: an area with 4 bonds counts as much as one with 400.
         """
         areas = rent_map.get(suburb, [])
         nbed = "NA" if bed == "All" else bed
@@ -67,22 +72,27 @@ def main():
                 if r["area"].strip() in areas and r["dwell"] == dwell
                 and r["nBedrms"] == nbed and r["med"] not in ("", "NA")]
         if not rows:
-            return None, None
-        med = round(sum(float(r["med"]) for r in rows) / len(rows))
+            return None
+
+        def avg(field):
+            vals = [float(r[field]) for r in rows if r[field] not in ("", "NA")]
+            return round(sum(vals) / len(vals)) if vals else None
+
+        med = avg("med")
         n = sum(int(r["nCurr"]) for r in rows if r["nCurr"] not in ("", "NA"))
-        return med, n
+        return [med, avg("lq"), avg("uq"), n]
 
     suburbs = []
     for feat in geo["features"]:
         p = feat["properties"]
         name = p["name"]
-        rent, sample = {}, {}
+        rent = {}
         for dwell in DWELLS:
-            rent[dwell], sample[dwell] = {}, {}
+            rent[dwell] = {}
             for bed in BEDS:
-                med, n = aggregate(name, dwell, bed)
-                if med:
-                    rent[dwell][bed], sample[dwell][bed] = med, n
+                cell = aggregate(name, dwell, bed)
+                if cell and cell[0]:
+                    rent[dwell][bed] = cell
         # Zero collapses to null so "no data" never reads as "no crime".
         crime = sum(crime_raw.get(a, 0) for a in crime_map.get(name, [])) or None
         suburbs.append({
@@ -91,7 +101,7 @@ def main():
             "region": p["region"],
             "population": p["population"],
             "crime_2025": crime,
-            "rent": rent, "n": sample,
+            "rent": rent,        # dwell -> bed -> [median, lq, uq, bonds]
         })
 
     json.dump(suburbs, open(os.path.join(DATA, "suburbs.json"), "w"),
@@ -108,7 +118,9 @@ def main():
         if r["med"] in ("", "NA"):
             continue
         n = int(r["nCurr"]) if r["nCurr"] not in ("", "NA") else 0
-        by_area[r["area"].strip()][r["dwell"]][r["nBedrms"]] = [int(float(r["med"])), n]
+        lq = int(float(r["lq"])) if r["lq"] not in ("", "NA") else None
+        uq = int(float(r["uq"])) if r["uq"] not in ("", "NA") else None
+        by_area[r["area"].strip()][r["dwell"]][r["nBedrms"]] = [int(float(r["med"])), lq, uq, n]
 
     raw = {
         "rent": {a: {"v": dict(v), "s": rent_parent.get(a)}
