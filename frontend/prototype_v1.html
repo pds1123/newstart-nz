@@ -235,7 +235,7 @@ input[type=range]::-webkit-slider-thumb {
   display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
 }
 .tile-map  { grid-column: span 2; grid-row: span 2; }
-.tile-tall { grid-row: span 2; }
+.tile-rank { grid-column: span 2; grid-row: span 2; }   /* two metrics per row needs the width */
 .tile-head {
   height: 34px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
   padding: 0 11px; border-bottom: 1px solid var(--border); overflow: hidden;
@@ -330,7 +330,7 @@ input[type=range]::-webkit-slider-thumb {
    tile the full width and let the board run long. */
 @media (max-width: 900px) {
   .board { grid-template-columns: 1fr; grid-auto-rows: 260px; }
-  .tile-map { grid-column: span 1; }
+  .tile-map, .tile-rank { grid-column: span 1; }
   .kpi-bar { flex-wrap: wrap; }
   .kpi-card { flex: 1 1 42%; }
 }
@@ -375,8 +375,13 @@ input[type=range]::-webkit-slider-thumb {
       </div>
 
       <div class="sidebar-section" id="gran-section">
-        <div class="filter-label">Area</div>
-        <select class="select" id="area-select" onchange="setArea(this.value)"></select>
+        <div class="filter-label">Region</div>
+        <select class="select" id="region-select" onchange="setRegion(this.value)"></select>
+        <div class="filter-label" style="margin-top:12px">Suburb</div>
+        <select class="select" id="suburb-select" onchange="setSuburbFilter(this.value)"></select>
+        <div class="pill-row" style="margin-top:9px">
+          <div class="pill" id="raw-pill" onclick="toggleRaw()">Source areas</div>
+        </div>
         <div class="bed-note" id="gran-note"></div>
       </div>
 
@@ -508,10 +513,14 @@ input[type=range]::-webkit-slider-thumb {
       </section>
 
       <!-- RANKING -->
-      <section class="tile tile-tall">
+      <section class="tile tile-rank">
         <div class="tile-head">
-          <span class="tile-title" id="rank-title">Ranking</span>
+          <span class="tile-title">Ranking</span>
           <span class="tile-sub" id="rank-sub"></span>
+          <div class="seg" id="rank-seg">
+            <button class="seg-btn active" data-sort="rent" onclick="setRankSort('rent')">Rent</button>
+            <button class="seg-btn" data-sort="safety" onclick="setRankSort('safety')">Safety</button>
+          </div>
         </div>
         <div class="tile-body scrolling" id="rank-body"><svg id="chart-rank"></svg></div>
       </section>
@@ -667,6 +676,7 @@ let currentBed   = '2';
 let currentDwell = 'All';
 let currentBudget = 650;
 let mapMode = 'combined';   // 'rent' | 'safety' | 'combined'
+let rankSort = 'rent';      // which metric orders the ranking list
 let sortKey = 'score', sortDir = -1;
 let selected = null;
 let markers = {};
@@ -1100,9 +1110,12 @@ function drawScatter() {
   const rMin = Math.min(...pts.map(p=>p.rent)), rMax = Math.max(...pts.map(p=>p.rent));
   const rLo = Math.floor((rMin - 30)/50)*50, rHi = Math.ceil((rMax + 30)/50)*50;
   const cMin = Math.min(...pts.map(p=>p.crime)), cMax = Math.max(...pts.map(p=>p.crime));
-  const lgLo = Math.log(Math.max(1,cMin)), lgHi = Math.log(cMax);
+  // A filter can leave one point standing — 2-bed rooms exist in a single
+  // suburb — and a zero-wide axis divides by zero. Give it a span either side.
+  const lgLo = Math.log(Math.max(1, cMin)), lgRaw = Math.log(Math.max(1, cMax));
+  const lgHi = lgRaw > lgLo ? lgRaw : lgLo + 1;
 
-  const sx = v => x0 + (v - rLo)/(rHi - rLo) * (x1 - x0);
+  const sx = v => rHi > rLo ? x0 + (v - rLo)/(rHi - rLo) * (x1 - x0) : (x0 + x1) / 2;
   const sy = v => y0 + (Math.log(Math.max(1,v)) - lgLo)/(lgHi - lgLo) * (y1 - y0);
   // Region dots scale by how many suburbs they contain; suburb dots by bonds lodged.
     // Same measure as the map markers, so the two views agree.
@@ -1171,9 +1184,9 @@ function drawScatter() {
 }
 
 // ── BAR CHART (Rent view / Safety view) ──
-const BAR_ROW = 19, BAR_TOP = 26;
+const BAR_ROW = 24, BAR_TOP = 32;   // two stacked marks per row
 // Rent labels carry a median plus a range, so they need more room than counts.
-const BAR_PAD_R = () => 56;
+const BAR_PAD_R = () => 48;
 const BAR_LABEL_W = () => (granularity === 'raw' ? 152 : 104);
 
 
@@ -1187,6 +1200,16 @@ function unitBarRows(isRent) {
                  lq: isRent ? getRentLQ(d) : null, uq: isRent ? getRentUQ(d) : null }))
     .filter(r => r.v != null)
     .sort((a, b) => a.v - b.v);
+}
+
+// Both metrics for one row. Suburbs missing one of them still appear — the
+// half that exists is worth ranking, and a gap says "not reported" where a
+// zero would say "none".
+function unitRankRows() {
+  return units()
+    .map(d => ({ d, rent: getRent(d), lq: getRentLQ(d), uq: getRentUQ(d),
+                 crime: getCrimeRate(d), n: getSample(d) }))
+    .filter(r => r.rent != null || r.crime != null);
 }
 
 function rawBarRows(isRent) {
@@ -1567,17 +1590,35 @@ function niceStep(max) {
   return [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
 }
 
-function drawBars() {
-  // Rent unless the map is showing safety — the ranking follows the map, so the
-  // board reads as one story rather than two unrelated halves.
-  const isRent = mapMode !== 'safety';
-  const rows = granularity === 'raw' ? rawBarRows(isRent) : unitBarRows(isRent);
-  document.getElementById('rank-title').textContent =
-    isRent ? (rentStat === 'mean' ? 'Mean rent ranking' : 'Rent ranking') : 'Safety ranking';
+// One list, both metrics. Rent and safety were two rankings of the same rows,
+// and switching between them meant holding the other one in your head. Each row
+// now carries a rent box plot above a crime bar, on their own scales — they are
+// different units, so the comparison is always down a column, never across.
+// Pale rose to deep red, log-scaled like the map's safety ramp.
+function crimeBarColor(v) {
+  const t = Math.min(1, Math.log(v + 1) / Math.log(3001));
+  return `rgb(${Math.round(238 - 100 * t)},${Math.round(190 - 128 * t)},${Math.round(190 - 128 * t)})`;
+}
 
-  // Height comes from the row count, not the tile — the tile scrolls. Override
-  // the stylesheet's height:100%, or the viewBox squashes every bar into one
-  // screen instead.
+function drawBars() {
+  const raw = granularity === 'raw';
+  const byRent = rankSort === 'rent';
+  document.querySelectorAll('#rank-seg .seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.sort === rankSort));
+
+  // Raw source areas cannot carry both: rent and crime are reported on
+  // different geographies there, so a row would be two unrelated places.
+  const rows = raw ? rawBarRows(byRent).map(r => byRent
+                       ? { ...r, rent: r.v, crime: null }
+                       : { ...r, rent: null, crime: r.v })
+                   : unitRankRows();
+  rows.sort((a, b) => {
+    const k = byRent ? 'rent' : 'crime';
+    if (a[k] == null) return 1;
+    if (b[k] == null) return -1;
+    return a[k] - b[k];
+  });
+
   const p = prepSvg('chart-rank', BAR_TOP + rows.length * BAR_ROW + 10);
   if (!p) return;
   const { svg, W, H } = p;
@@ -1585,113 +1626,113 @@ function drawBars() {
   if (!rows.length) {
     svg.appendChild(el('text', { x: W/2, y: 40, 'text-anchor':'middle', class:'sc-tick' },
       'No data for this filter'));
+    document.getElementById('rank-sub').textContent = '';
     return;
   }
 
   const x0 = BAR_LABEL_W(), x1 = W - BAR_PAD_R();
+  // Both axes stop at the 95th percentile. Crime per capita is long-tailed —
+  // Manukau City Centre reports 1,209 per 1,000 against a median near 60 — and
+  // scaling to the maximum squashes every ordinary suburb into a sliver.
+  const pct = (vals, p) => {
+    const s = vals.filter(v => v != null).sort((a, b) => a - b);
+    return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * p))] : null;
+  };
+  // Rent is framed on the band it actually occupies. Auckland's medians sit
+  // between about $490 and $700 for any one filter, and an axis from zero
+  // parks every box in the last third where they all look alike. A box plot
+  // encodes position, not length, so a non-zero origin costs nothing. Crime
+  // is a rate and its bars do encode length, so that axis keeps its zero.
+  const rentHiV = pct(rows.map(r => r.uq ?? r.rent), 0.95);
+  const rentLoV = pct(rows.map(r => r.lq ?? r.rent), 0.02);
+  const rentMax = rentHiV == null ? null : niceCeil(rentHiV);
+  const rentMin = rentLoV == null ? null
+    : Math.max(0, Math.floor(rentLoV / niceStep(rentMax) ) * niceStep(rentMax));
+  const crimeMax = (() => { const v = pct(rows.map(r => r.crime), 0.95);
+                            return v == null ? null : niceCeil(v); })();
 
-  // Rent is drawn as a box plot: the interquartile box with the median inside
-  // it. Two suburbs can share a median and be nothing alike — one letting a
-  // narrow band of similar places, the other pooling $200 flats with $700
-  // houses — and a bar cannot show that while a box can. Safety has no spread
-  // to show, so it stays a bar.
-  const boxes = isRent && rows.some(r => r.lq && r.uq);
-  const spread = rows.map(r => (boxes ? (r.uq || r.v) : r.v)).sort((a, b) => a - b);
-  // Crime per capita is long-tailed: a handful of commercial centres run 20x the
-  // residential suburbs, and scaling to them squashes everything else into a
-  // sliver. Cut the axis at the 95th percentile and flag what runs past it.
-  const maxV = niceCeil(spread[Math.min(spread.length - 1, Math.floor(spread.length * 0.95))]);
-  const CLIP_GAP = 7;   // room for the over-scale chevron
-  const scale = v => Math.min(v, maxV) / maxV * (x1 - x0 - CLIP_GAP);
+  const CLIP_GAP = 7;
+  const span = x1 - x0 - CLIP_GAP;
+  const sRent = v => Math.max(0, Math.min(v, rentMax) - rentMin) / (rentMax - rentMin) * span;
+  const sCrime = v => Math.min(v, crimeMax) / crimeMax * span;
 
-  svg.appendChild(el('text', { x: 0, y: 14, class: 'sc-axis-label' },
-    isRent ? '$ / WEEK' : 'PER 1,000'));
-
-  // Grid behind the boxes, so a reader can place a value without a ruler.
-  const step = niceStep(maxV);
-  for (let v = step; v <= maxV; v += step) {
-    const gx = x0 + scale(v);
-    svg.appendChild(el('line', { x1: gx, y1: BAR_TOP - 6, x2: gx, y2: H - 6, class: 'sc-grid' }));
-    svg.appendChild(el('text', { x: gx, y: 14, 'text-anchor': 'middle', class: 'sc-tick' },
-      isRent ? '$' + v : v.toLocaleString()));
+  if (rentMax) {
+    svg.appendChild(el('text', { x: 0, y: 11, class: 'sc-axis-label', fill: '#1D9E75' }, '$ / WEEK'));
+    svg.appendChild(el('text', { x: x1, y: 11, 'text-anchor': 'end', class: 'sc-tick',
+                                 fill: '#1D9E75' }, `$${rentMin} \u2013 $${rentMax}`));
   }
+  if (crimeMax) {
+    svg.appendChild(el('text', { x: 0, y: 23, class: 'sc-axis-label', fill: '#C83E3E' },
+      raw ? 'VICTIMS' : 'PER 1,000'));
+    svg.appendChild(el('text', { x: x1, y: 23, 'text-anchor': 'end', class: 'sc-tick',
+                                 fill: '#C83E3E' }, `0 \u2013 ${crimeMax.toLocaleString()}`));
+  }
+
+  const chevron = (g, x, y, colour) => [0, 4].forEach(dx => g.appendChild(el('path', {
+    d: `M${x + dx} ${y}L${x + dx + 3} ${y + 3.5}L${x + dx} ${y + 7}`,
+    fill: 'none', stroke: colour, 'stroke-width': 1.4, 'stroke-linecap': 'round',
+  })));
 
   const labels = [];
   rows.forEach((r, i) => {
     const y = BAR_TOP + i * BAR_ROW;
     const isSel = selected === r.d.suburb;
-    const over = isRent && r.v > currentBudget;
-    const colour = isRent ? rentColor(r.v) : safetyColor(r.v);
+    const over = r.rent != null && r.rent > currentBudget;
 
     const g = el('g', { class: 'bar-g' });
     g.dataset.suburb = r.d.suburb;
-
-    g.appendChild(el('rect', {
-      x: 0, y: y - 2, width: W, height: BAR_ROW,
-      fill: isSel ? '#E6F7F1' : 'transparent', class: 'bar-hit',
-    }));
-    const label = el('text', {
-      x: x0 - 7, y: y + 11, 'text-anchor': 'end',
-      class: 'bar-label' + (isSel ? ' sel' : ''),
-    }, r.d.suburb);
+    g.appendChild(el('rect', { x: 0, y: y - 1, width: W, height: BAR_ROW,
+                               fill: isSel ? '#E6F7F1' : 'transparent', class: 'bar-hit' }));
+    const label = el('text', { x: x0 - 7, y: y + 11, 'text-anchor': 'end',
+                               class: 'bar-label' + (isSel ? ' sel' : '') }, r.d.suburb);
     g.appendChild(label);
     labels.push(label);
 
-    const mid = y + (BAR_ROW - 3) / 2;
-    if (boxes && r.lq && r.uq) {
-      const bx = x0 + scale(r.lq), bw = Math.max(2, scale(r.uq) - scale(r.lq));
-      // Whisker from zero to the box, so the absolute level stays readable.
-      g.appendChild(el('line', {
-        x1: x0, y1: mid, x2: bx, y2: mid,
-        stroke: colour, 'stroke-width': 1, 'stroke-opacity': over ? 0.25 : 0.45,
-      }));
-      g.appendChild(el('rect', {
-        x: bx, y: y + 3, width: bw, height: BAR_ROW - 9, rx: 2,
-        fill: colour, 'fill-opacity': over ? 0.3 : 0.75,
-      }));
-      // A rule through the box is the median; a diamond is the mean. They are
-      // different statistics and the box's own edges are always empirical
-      // quartiles, so the mark has to say which one it is.
-      const mx = x0 + scale(r.v);
-      if (rentStat === 'mean') {
-        g.appendChild(el('path', {
-          d: `M${mx} ${y + 2}L${mx + 4} ${mid}L${mx} ${y + BAR_ROW - 5}L${mx - 4} ${mid}Z`,
-          fill: '#0F1C18', 'fill-opacity': over ? 0.3 : 0.8,
-        }));
-      } else {
-        g.appendChild(el('line', {
-          x1: mx, y1: y + 2, x2: mx, y2: y + BAR_ROW - 5,
-          stroke: '#0F1C18', 'stroke-width': 1.6, 'stroke-opacity': over ? 0.3 : 0.8,
-        }));
+    // Rent on the upper half: whisker to the lower quartile, box across the
+    // interquartile range, a rule for the median or a diamond for the mean.
+    if (r.rent != null) {
+      const colour = rentColor(r.rent), op = over ? 0.32 : 0.85;
+      const yc = y + 6, top = y + 2.5, bot = y + 9.5;
+      const mx = x0 + sRent(r.rent);
+      const box = r.lq != null && r.uq != null;
+      if (box) {
+        g.appendChild(el('rect', {
+          x: x0 + sRent(r.lq), y: top, width: Math.max(2, sRent(r.uq) - sRent(r.lq)),
+          height: bot - top, rx: 1.5, fill: colour, 'fill-opacity': op * 0.85 }));
       }
-    } else {
-      g.appendChild(el('rect', {
-        x: x0, y: y + 3, width: Math.max(1, scale(r.v)), height: BAR_ROW - 9, rx: 2,
-        fill: colour, 'fill-opacity': over ? 0.35 : 1,
-      }));
-    }
-    if ((boxes ? (r.uq || r.v) : r.v) > maxV) {
-      const cx = x1 - CLIP_GAP + 2;
-      [0, 4].forEach(dx => g.appendChild(el('path', {
-        d: `M${cx + dx} ${y + 4}L${cx + dx + 3} ${mid}L${cx + dx} ${y + BAR_ROW - 6}`,
-        fill: 'none', stroke: colour, 'stroke-width': 1.5, 'stroke-linecap': 'round',
-      })));
+      // Without quartiles there is no box to place, so the median gets a dot.
+      g.appendChild(box
+        ? (rentStat === 'mean'
+            ? el('path', { d: `M${mx} ${top - 1}L${mx + 3.5} ${yc}L${mx} ${bot + 1}L${mx - 3.5} ${yc}Z`,
+                           fill: '#0F1C18', 'fill-opacity': op })
+            : el('line', { x1: mx, y1: top - 1, x2: mx, y2: bot + 1,
+                           stroke: '#0F1C18', 'stroke-width': 1.5, 'stroke-opacity': op }))
+        : el('circle', { cx: mx, cy: yc, r: 3.2, fill: colour, 'fill-opacity': op,
+                         stroke: '#0F1C18', 'stroke-width': 1, 'stroke-opacity': op * 0.7 }));
+      if ((r.uq ?? r.rent) > rentMax) chevron(g, x1 - CLIP_GAP + 2, y + 2.5, colour);
+      g.appendChild(el('text', { x: W - 5, y: y + 9, 'text-anchor': 'end', class: 'bar-val',
+                                 fill: '#166B4F', 'fill-opacity': over ? 0.45 : 1 }, '$' + r.rent));
     }
 
-    const valueText = isRent ? `$${r.v}` : Math.round(r.v).toLocaleString();
-    g.appendChild(el('text', {
-      x: x1 + 6, y: y + 11, class: 'bar-val',
-    }, valueText));
+    // Crime on the lower half, always a plain bar — a rate has no spread to show.
+    if (r.crime != null) {
+      // A red ramp rather than the map's green-to-red one: next to a green rent
+      // box, a low-crime green bar reads as a second rent bar.
+      const colour = crimeBarColor(r.crime);
+      g.appendChild(el('rect', { x: x0, y: y + 12.5, width: Math.max(1, sCrime(r.crime)),
+                                 height: 5, rx: 1.5, fill: colour, 'fill-opacity': 0.9 }));
+      if (r.crime > crimeMax) chevron(g, x1 - CLIP_GAP + 2, y + 11, colour);
+      g.appendChild(el('text', { x: W - 5, y: y + 19, 'text-anchor': 'end', class: 'bar-val',
+                                 fill: '#B04A44' }, Math.round(r.crime).toLocaleString()));
+    }
 
     const target = r.d._parent || r.d.suburb;
     g.addEventListener('mouseenter', e => {
       highlightMarker(target, true);
-      showRawTip(r, isRent, e.clientX, e.clientY);
+      if (raw) showRawTip({ ...r, v: byRent ? r.rent : r.crime }, byRent, e.clientX, e.clientY);
+      else showTip(r.d, e.clientX, e.clientY);
     });
-    g.addEventListener('mouseleave', () => {
-      highlightMarker(target, false);
-      hideTip();
-    });
+    g.addEventListener('mouseleave', () => { highlightMarker(target, false); hideTip(); });
     g.addEventListener('click', () => selectSuburb(target, true));
     svg.appendChild(g);
   });
@@ -1709,11 +1750,11 @@ function drawBars() {
     t.textContent = full.slice(0, lo) + '\u2026';
   });
 
-  const noun = granularity === 'raw' ? (isRent ? 'statistical areas' : 'police areas')
+  const noun = raw ? (byRent ? 'statistical areas' : 'police areas')
              : granularity === 'region' ? 'regions' : 'suburbs';
   document.getElementById('rank-sub').textContent =
     `${rows.length} ${noun}` + (scope ? ` in ${scope}` : '') +
-    ` · ${isRent ? 'cheapest first' : 'safest first'}`;
+    ` · ${byRent ? 'cheapest first' : 'safest first'}`;
 }
 
 // ── CROSS-HIGHLIGHT ──
@@ -1750,9 +1791,10 @@ function selectSuburb(name, panMap) {
   }
   selected = name;
   const m = markers[name];
-  if (m && panMap) map.setView([m.data.lat, m.data.lng], 14, { animate: true });
+  if (m && panMap) map.setView([m.data.lat, m.data.lng], 14, { animate: false });
   buildMarkers();
   drawChart();
+  syncAreaSelects();
 }
 
 // ── KPI ──
@@ -1850,7 +1892,7 @@ function setGranularity(g, into) {
   // clears the scope so that level shows everything again.
   scope = into || null;
 
-  syncAreaSelect();
+  syncAreaSelects();
 
   refresh();
   renderCrumbs();
@@ -1859,48 +1901,72 @@ function setGranularity(g, into) {
 
 
 
-// One control for "what am I looking at". The level and the region were two
-// questions with one honest answer between them: you are either seeing all of
-// Auckland at region level, or you are inside a region seeing its suburbs. So
-// they share a dropdown, with the regions grouped under it.
+// Two cascading dropdowns: which region, then which suburb inside it. They map
+// onto the two pieces of state the board already had — `scope` narrows what is
+// drawn, `selected` highlights one of them — so picking from them is the same
+// operation as clicking the map, just reachable without hunting for a shape.
 const AREA_NOTE = {
   region: 'Six compass regions, drawn as solid blocks.',
   suburb: 'LINZ suburbs of urban Auckland.',
-  raw: 'The boundaries each dataset ships with.',
+  raw: 'The boundaries each dataset ships with. Rent and safety use different '
+     + 'ones, so the two rankings are not comparable here.',
 };
+const REGION_OF = Object.fromEntries(SUBURB_DATA.map(d => [d.suburb, d.region]));
 
-function setArea(value) {
-  if (value.startsWith('in:')) setGranularity('suburb', value.slice(3));
-  else setGranularity(value);
+function setRegion(r) {
+  if (r === 'all') setGranularity('region');
+  else setGranularity('suburb', r);
 }
 
-// The current state as a dropdown value. Clicking the map can put us in states
-// the dropdown has no option for — one suburb selected, say — in which case the
-// nearest enclosing option stays chosen.
-function areaValue() {
-  if (granularity === 'raw') return 'raw';
-  if (granularity === 'region') return 'region';
-  return scope && REGION_SUBURBS[scope] ? 'in:' + scope : 'suburb';
+function setSuburbFilter(s) {
+  if (s === 'all') { selected = null; buildMarkers(); drawChart(); syncAreaSelects(); return; }
+  // Picking a suburb while the board is still showing whole regions drops a
+  // level first, so the thing you picked is actually on screen to highlight.
+  if (granularity === 'region') setGranularity('suburb', REGION_OF[s]);
+  selectSuburb(s, true);
 }
 
-function syncAreaSelect() {
-  const sel = document.getElementById('area-select');
-  const raw = GRAN_STOPS.includes('raw');
-  const rawN = mapMode === 'safety' ? Object.keys(RAW_AREAS.crime).length
-                                    : Object.keys(RAW_AREAS.rent).length;
-  sel.innerHTML =
-      `<option value="region">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
-    + `<option value="suburb">All suburbs \u00B7 ${SUBURB_DATA.length}</option>`
-    + '<optgroup label="Inside one region">'
-    + REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r =>
-        `<option value="in:${r}">${r} \u00B7 ${REGION_SUBURBS[r].length} `
-        + `suburb${REGION_SUBURBS[r].length === 1 ? '' : 's'}</option>`).join('')
-    + '</optgroup>'
-    + (raw ? `<option value="raw">Source areas \u00B7 ${rawN}</option>` : '');
-  sel.value = areaValue();
+function toggleRaw() {
+  setGranularity(granularity === 'raw' ? 'suburb' : 'raw');
+}
+
+function syncAreaSelects() {
+  const rsel = document.getElementById('region-select');
+  rsel.innerHTML =
+      `<option value="all">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
+    + REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r => {
+        const n = REGION_SUBURBS[r].length;
+        return `<option value="${r}">${r} \u00B7 ${n} suburb${n === 1 ? '' : 's'}</option>`;
+      }).join('');
+  rsel.value = scope && REGION_SUBURBS[scope] ? scope : 'all';
+
+  // Inside a region the suburb list is that region's. Outside one it is all of
+  // them, grouped, so the list still says which region each belongs to.
+  const ssel = document.getElementById('suburb-select');
+  const inScope = scope && REGION_SUBURBS[scope];
+  const opt = s => `<option value="${s}">${s}</option>`;
+  ssel.innerHTML = `<option value="all">All suburbs \u00B7 ${
+      inScope ? REGION_SUBURBS[scope].length : SUBURB_DATA.length}</option>`
+    + (inScope
+        ? REGION_SUBURBS[scope].slice().sort().map(opt).join('')
+        : REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r =>
+            `<optgroup label="${r}">${REGION_SUBURBS[r].slice().sort().map(opt).join('')}</optgroup>`
+          ).join(''));
+  ssel.value = selected && REGION_OF[selected] ? selected : 'all';
+  ssel.disabled = granularity === 'raw';
+
+  const pill = document.getElementById('raw-pill');
+  const rawOK = GRAN_STOPS.includes('raw');
+  pill.style.display = rawOK ? '' : 'none';
+  if (rawOK) {
+    pill.textContent = 'Source areas \u00B7 ' + (mapMode === 'safety'
+      ? Object.keys(RAW_AREAS.crime).length : Object.keys(RAW_AREAS.rent).length);
+  }
+  pill.classList.toggle('active', granularity === 'raw');
+
   document.getElementById('gran-note').textContent =
-    granularity === 'suburb' && scope ? `The ${scope} region, suburb by suburb.`
-                                      : AREA_NOTE[granularity];
+    granularity === 'suburb' && inScope ? `The ${scope} region, suburb by suburb.`
+                                        : AREA_NOTE[granularity];
 }
 
 // The ranking views can drop to the boundaries each dataset ships with; the
@@ -1909,29 +1975,32 @@ function syncAreaSelect() {
 function syncGranStops() {
   GRAN_STOPS = mapMode === 'combined' ? ['region','suburb'] : ['region','suburb','raw'];
   if (!GRAN_STOPS.includes(granularity)) { setGranularity('suburb'); return; }
-  syncAreaSelect();
+  syncAreaSelects();
 }
 
 // Five region centroids sit far wider apart than 62 suburb markers, so a view
 // framed for one granularity leaves markers off-screen in the other.
 let pendingFit = false;
-function fitToUnits(animate = true) {
+// Every view change here is instant, not animated. One state change can move
+// the map twice — picking a suburb drops a level and then centres on it — and
+// Leaflet's stop() cancels a pan but not a zoom animation, so an animated hop
+// left in flight lands on top of whatever was decided after it.
+function fitToUnits() {
   // Before the board lays out the map has no size, and fitBounds against a
   // zero-width container silently lands on maxZoom. Defer instead: settle()
   // picks the fit up as soon as there is something to measure.
   if (map.getSize().x < 50) { pendingFit = true; return; }
   pendingFit = false;
-  map.stop();   // cancel any pan/zoom still in flight, or it lands on top of this
   // Fit the drawn shapes where there are shapes. Region centroids sit well
   // inside their own coastlines, so fitting to the six points cropped North
   // and left half the harbour off the tile.
   const drawn = Object.values(shapes);
   if (drawn.length) {
     const b = drawn.reduce((acc, l) => acc ? acc.extend(l.getBounds()) : l.getBounds(), null);
-    if (b) { map.fitBounds(b, { padding: [18, 18], maxZoom: 12, animate }); return; }
+    if (b) { map.fitBounds(b, { padding: [18, 18], maxZoom: 12, animate: false }); return; }
   }
   const pts = units().map(u => [u.lat, u.lng]);
-  if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 12, animate });
+  if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 12, animate: false });
 }
 
 // ── REFRESH ──
@@ -1998,6 +2067,8 @@ function setMapMode(m) {
   refresh();   // medians and KPIs depend on granularity, which this may have changed
   updateToolbarNote();
 }
+
+function setRankSort(s) { rankSort = s; drawBars(); }
 
 function setRentStat(s) {
   rentStat = s;
@@ -2102,7 +2173,7 @@ setGranularity('region');
 let rt, lastW = 0, lastH = 0;
 function settle() {
   map.invalidateSize();
-  if (pendingFit) fitToUnits(false);
+  if (pendingFit) fitToUnits();
   drawChart();
 }
 requestAnimationFrame(settle);
