@@ -9,7 +9,7 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rankings, spread, region comparison, scatter, rent by bedrooms |
+| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
