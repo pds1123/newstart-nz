@@ -158,6 +158,8 @@ nav {
   background-repeat: no-repeat; background-position: right 11px center;
 }
 .select:hover { border-color: var(--green-light); }
+.select:disabled { color: var(--faint); background-color: var(--bg); cursor: default; opacity: 1; }
+.select:disabled:hover { border-color: var(--border); }
 .select:focus { outline: none; border-color: var(--green-mid); }
 
 /* Data provenance */
@@ -1642,9 +1644,10 @@ function setGranularity(g, into) {
   // clears the scope so that level shows everything again.
   scope = into || null;
 
-  syncAreaSelects();
-
+  // After refresh, not before: the suburb list is built from what is actually
+  // drawn, and refresh() is what decides that.
   refresh();
+  syncAreaSelects();
   renderCrumbs();
   fitToUnits();
 }
@@ -1657,50 +1660,56 @@ function setGranularity(g, into) {
 // operation as clicking the map, just reachable without hunting for a shape.
 const AREA_NOTE = {
   region: 'Six compass regions, drawn as solid blocks.',
-  suburb: 'LINZ suburbs of urban Auckland.',
+  suburb: 'Every LINZ suburb of urban Auckland.',
 };
 const REGION_OF = Object.fromEntries(SUBURB_DATA.map(d => [d.suburb, d.region]));
 
 function setRegion(r) {
-  if (r === 'all') setGranularity('region');
+  if (r === 'regions') setGranularity('region');
+  else if (r === 'suburbs') setGranularity('suburb');
   else setGranularity('suburb', r);
 }
 
 function setSuburbFilter(s) {
   if (s === 'all') { selected = null; buildMarkers(); drawChart(); syncAreaSelects(); return; }
-  // Picking a suburb while the board is still showing whole regions drops a
-  // level first, so the thing you picked is actually on screen to highlight.
+  // The search box can reach a suburb from the region overview, where nothing
+  // is drawn per suburb; drop a level first so there is a marker to highlight.
   if (granularity === 'region') setGranularity('suburb', REGION_OF[s]);
   selectSuburb(s, true);
 }
 
+// Both dropdowns describe exactly what the map is drawing. The region select
+// says which shapes are on it and how many; the suburb select lists those same
+// shapes, and is dead while the map shows regions because at that level there
+// is no per-suburb mark to pick out.
 function syncAreaSelects() {
   const rsel = document.getElementById('region-select');
   rsel.innerHTML =
-      `<option value="all">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
+      `<option value="regions">All Auckland \u00B7 ${Object.keys(REGION_SUBURBS).length} regions</option>`
+    + `<option value="suburbs">All Auckland \u00B7 ${SUBURB_DATA.length} suburbs</option>`
+    + '<optgroup label="Inside one region">'
     + REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r => {
         const n = REGION_SUBURBS[r].length;
         return `<option value="${r}">${r} \u00B7 ${n} suburb${n === 1 ? '' : 's'}</option>`;
-      }).join('');
-  rsel.value = scope && REGION_SUBURBS[scope] ? scope : 'all';
+      }).join('')
+    + '</optgroup>';
+  rsel.value = granularity === 'region' ? 'regions'
+             : (scope && REGION_SUBURBS[scope]) ? scope : 'suburbs';
 
-  // Inside a region the suburb list is that region's. Outside one it is all of
-  // them, grouped, so the list still says which region each belongs to.
   const ssel = document.getElementById('suburb-select');
-  const inScope = scope && REGION_SUBURBS[scope];
-  const opt = s => `<option value="${s}">${s}</option>`;
-  ssel.innerHTML = `<option value="all">All suburbs \u00B7 ${
-      inScope ? REGION_SUBURBS[scope].length : SUBURB_DATA.length}</option>`
-    + (inScope
-        ? REGION_SUBURBS[scope].slice().sort().map(opt).join('')
-        : REGION_ORDER.filter(r => REGION_SUBURBS[r]).map(r =>
-            `<optgroup label="${r}">${REGION_SUBURBS[r].slice().sort().map(opt).join('')}</optgroup>`
-          ).join(''));
-  ssel.value = selected && REGION_OF[selected] ? selected : 'all';
+  const atRegion = granularity === 'region';
+  const drawn = units().map(d => d.suburb).sort();
+  ssel.disabled = atRegion;
+  ssel.innerHTML = atRegion
+    ? '<option value="all">\u2014</option>'
+    : `<option value="all">All suburbs \u00B7 ${drawn.length}</option>`
+      + drawn.map(s => `<option value="${s}">${s}</option>`).join('');
+  ssel.value = !atRegion && selected && drawn.includes(selected) ? selected : 'all';
 
   document.getElementById('gran-note').textContent =
-    granularity === 'suburb' && inScope ? `The ${scope} region, suburb by suburb.`
-                                        : AREA_NOTE[granularity];
+    atRegion ? AREA_NOTE.region
+    : scope && REGION_SUBURBS[scope] ? `The ${scope} region, suburb by suburb.`
+    : AREA_NOTE.suburb;
 }
 
 
