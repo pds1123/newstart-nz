@@ -387,6 +387,24 @@ input[type=range]::-webkit-slider-thumb {
         <div class="bed-note" id="gran-note"></div>
       </div>
 
+      <div class="sidebar-section" id="legend-section">
+        <div class="filter-label">Map colour</div>
+        <div class="seg seg-wide" id="metric-seg">
+          <button class="seg-btn" data-metric="rent" onclick="setMapMode('rent')">Rent</button>
+          <button class="seg-btn" data-metric="safety" onclick="setMapMode('safety')">Safety</button>
+          <button class="seg-btn active" data-metric="combined" onclick="setMapMode('combined')">Combined</button>
+        </div>
+        <div class="filter-label" id="legend-title" style="margin-top:14px">Legend</div>
+        <div class="q-legend" id="q-legend"></div>
+        <div class="biv-legend" id="biv-legend">
+          <div class="biv-grid" id="biv-grid"></div>
+          <div class="biv-axes">
+            <span class="biv-x">cheaper \u2192 dearer</span>
+            <span class="biv-y">safer \u2192 riskier</span>
+          </div>
+        </div>
+      </div>
+
       <div class="sidebar-section">
         <div class="filter-label">Bedrooms</div>
         <div class="pill-row" id="bed-group">
@@ -429,24 +447,6 @@ input[type=range]::-webkit-slider-thumb {
           <span class="slider-range">$300 – $1,200</span>
         </div>
         <input type="range" id="budget-slider" min="300" max="1200" value="650" step="25" oninput="onSlider(this)">
-      </div>
-
-      <div class="sidebar-section" id="legend-section">
-        <div class="filter-label">Map colour</div>
-        <div class="seg seg-wide" id="metric-seg">
-          <button class="seg-btn" data-metric="rent" onclick="setMapMode('rent')">Rent</button>
-          <button class="seg-btn" data-metric="safety" onclick="setMapMode('safety')">Safety</button>
-          <button class="seg-btn active" data-metric="combined" onclick="setMapMode('combined')">Combined</button>
-        </div>
-        <div class="filter-label" id="legend-title" style="margin-top:14px">Legend</div>
-        <div class="q-legend" id="q-legend"></div>
-        <div class="biv-legend" id="biv-legend">
-          <div class="biv-grid" id="biv-grid"></div>
-          <div class="biv-axes">
-            <span class="biv-x">cheaper \u2192 dearer</span>
-            <span class="biv-y">safer \u2192 riskier</span>
-          </div>
-        </div>
       </div>
 
       <div class="sidebar-section">
@@ -525,7 +525,7 @@ input[type=range]::-webkit-slider-thumb {
 
       <section class="tile tile-rank">
         <div class="tile-head">
-          <span class="tile-title">Safety ranking</span>
+          <span class="tile-title" id="rank-safety-title">Safety ranking</span>
           <span class="tile-sub" id="rank-safety-sub"></span>
         </div>
         <div class="tile-body scrolling"><svg id="chart-rank-safety"></svg></div>
@@ -547,15 +547,6 @@ input[type=range]::-webkit-slider-thumb {
           <span class="tile-sub" id="regions-sub"></span>
         </div>
         <div class="tile-body"><svg id="chart-regions"></svg></div>
-      </section>
-
-      <!-- INSIDE ONE SUBURB — the third level -->
-      <section class="tile tile-rank" id="tile-inside" style="display:none">
-        <div class="tile-head">
-          <span class="tile-title" id="inside-title">Inside the suburb</span>
-          <span class="tile-sub" id="inside-sub"></span>
-        </div>
-        <div class="tile-body scrolling"><svg id="chart-inside"></svg></div>
       </section>
 
       <!-- SCATTER -->
@@ -1047,7 +1038,7 @@ function el(tag, attrs, text) {
 function drawChart() {
   // Each tile draws independently. One of them throwing used to take the rest
   // of the board with it, which turned a single bad scale into a blank page.
-  [drawBars, drawSpread, drawRegionBars, drawScatter, drawInside].forEach(fn => {
+  [drawBars, drawSpread, drawRegionBars, drawScatter].forEach(fn => {
     try { fn(); } catch (e) { console.error(fn.name, e); }
   });
 }
@@ -1297,11 +1288,15 @@ function drawSpread() {
 // of the 123 suburbs carrying both are built from a different number of areas
 // on each side — so a row holding both would be inventing an alignment that
 // does not exist.
+// Same row shape as unitBarRows, so the ranking draws them without knowing
+// which it was handed.
 function insideRows(kind) {
   const src = SOURCE_AREAS[selected];
   if (!src) return [];
-  if (kind === 'crime') {
-    return (src.c || []).map(([area, n]) => ({ area, v: n })).sort((a, b) => b.v - a.v);
+  const row = (area, rest) => ({ d: { suburb: area, _source: true }, ...rest });
+  if (kind === 'safety') {
+    return (src.c || []).map(([area, n]) => row(area, { v: n }))
+                        .sort((a, b) => a.v - b.v);
   }
   const stat = rentStat === 'mean' ? RENT_MEAN : RENT_MED;
   const rows = [];
@@ -1309,7 +1304,7 @@ function insideRows(kind) {
     const dwells = currentDwell === 'All' ? WHOLE : [currentDwell];
     const got = dwells.map(dw => (cells[dw] || {})[currentBed])
                       .filter(c => c && c[stat] != null);
-    if (!got.length) { rows.push({ area, v: null }); return; }
+    if (!got.length) return;              // this area reports nothing for the filter
     const n = got.reduce((a, c) => a + (c[RENT_N] || 0), 0);
     const w = (i) => {
       const vs = got.filter(c => c[i] != null);
@@ -1317,131 +1312,9 @@ function insideRows(kind) {
       const den = vs.reduce((a, c) => a + (c[RENT_N] || 1), 0);
       return Math.round(vs.reduce((a, c) => a + c[i] * (c[RENT_N] || 1), 0) / den);
     };
-    rows.push({ area, v: w(stat), lq: w(RENT_LQ), uq: w(RENT_UQ), n });
+    rows.push(row(area, { v: w(stat), lq: w(RENT_LQ), uq: w(RENT_UQ), n }));
   });
-  return rows.sort((a, b) => (a.v ?? Infinity) - (b.v ?? Infinity));
-}
-
-function drawInside() {
-  const tile = document.getElementById('tile-inside');
-  const src = selected ? SOURCE_AREAS[selected] : null;
-  if (!sourceView || !src) { tile.style.display = 'none'; return; }
-  tile.style.display = '';
-
-  const isRent = sourceView === 'rent';
-  const rows = insideRows(sourceView);
-  const shown = rows.filter(r => r.v != null);
-  document.getElementById('inside-title').textContent =
-    `Inside ${selected} · ${isRent ? 'rent' : 'safety'}`;
-
-  tile.style.gridRow = rows.length > 8 ? 'span 2' : 'span 1';
-  const p = prepSvg('chart-inside', BAR_TOP + rows.length * BAR_ROW + 30);
-  if (!p) return;
-  const { svg, W, H } = p;
-
-  if (!shown.length) {
-    svg.appendChild(el('text', { x: W/2, y: 44, 'text-anchor': 'middle', class: 'sc-tick' },
-      `No ${isRent ? 'rent' : 'crime'} figures for this filter`));
-    document.getElementById('inside-sub').textContent = '';
-    return;
-  }
-
-  const x0 = 152, x1 = W - 52, CLIP = 7, span = x1 - x0 - CLIP;
-  // The suburb's own figure, so the reader can see where the average landed
-  // among the parts it was made from.
-  // In the same units as the parts: the parts are victim counts, so the
-  // suburb's reference is their total, not the per-1,000 rate the rest of the
-  // page ranks on.
-  const unit = units().find(d => d.suburb === selected);
-  const own = unit ? (isRent ? getRent(unit) : unit.crime_2025) : null;
-
-  const vals = shown.map(r => (isRent ? (r.uq ?? r.v) : r.v));
-  const hi = niceCeil(Math.max(...vals, own || 0));
-  const step = niceStep(hi);
-  const lo = isRent
-    ? Math.max(0, Math.floor(Math.min(...shown.map(r => r.lq ?? r.v)) / step) * step)
-    : 0;
-  const scale = v => Math.max(0, Math.min(v, hi) - lo) / (hi - lo) * span;
-
-  svg.appendChild(el('text', { x: 0, y: 14, class: 'sc-axis-label' },
-    isRent ? '$ / WEEK' : 'VICTIMS 2025'));
-  for (let v = Math.ceil((lo + step / 2) / step) * step; v <= hi; v += step) {
-    const gx = x0 + scale(v);
-    svg.appendChild(el('line', { x1: gx, y1: BAR_TOP - 6, x2: gx, y2: H - 26, class: 'sc-grid' }));
-    svg.appendChild(el('text', { x: gx, y: 14, 'text-anchor': 'middle', class: 'sc-tick' },
-      isRent ? '$' + v : v.toLocaleString()));
-  }
-
-  const labels = [];
-  rows.forEach((r, i) => {
-    const y = BAR_TOP + i * BAR_ROW;
-    const g = el('g', {});
-    const label = el('text', { x: x0 - 7, y: y + 11, 'text-anchor': 'end', class: 'bar-label' },
-      r.area);
-    g.appendChild(label);
-    labels.push(label);
-
-    if (r.v == null) {
-      g.appendChild(el('text', { x: x0, y: y + 11, class: 'sc-tick' }, 'not reported'));
-      svg.appendChild(g);
-      return;
-    }
-    const colour = isRent ? rentColor(r.v) : safetyColor(r.v);
-    if (isRent && r.lq != null && r.uq != null) {
-      g.appendChild(el('rect', { x: x0 + scale(r.lq), y: y + 3,
-        width: Math.max(2, scale(r.uq) - scale(r.lq)), height: BAR_ROW - 9, rx: 2,
-        fill: colour, 'fill-opacity': 0.75 }));
-      const mx = x0 + scale(r.v);
-      g.appendChild(el('line', { x1: mx, y1: y + 2, x2: mx, y2: y + BAR_ROW - 5,
-        stroke: '#0F1C18', 'stroke-width': 1.6, 'stroke-opacity': 0.8 }));
-    } else {
-      g.appendChild(el('rect', { x: x0, y: y + 3, width: Math.max(1, scale(r.v)),
-        height: BAR_ROW - 9, rx: 2, fill: colour, 'fill-opacity': 0.9 }));
-    }
-    g.appendChild(el('text', { x: W - 5, y: y + 11, 'text-anchor': 'end', class: 'bar-val' },
-      isRent ? '$' + r.v : r.v.toLocaleString()));
-    g.appendChild(el('title', {}, r.n ? `${r.area}\n${r.n.toLocaleString()} active bonds` : r.area));
-    svg.appendChild(g);
-  });
-
-  // Where the suburb's published figure sits among its parts.
-  if (own != null && own >= lo && own <= hi) {
-    const ox = x0 + scale(own);
-    svg.appendChild(el('line', { x1: ox, y1: BAR_TOP - 6, x2: ox, y2: H - 26,
-      stroke: '#0F1C18', 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }));
-    const anchor = ox > W - 110 ? 'end' : 'start';
-    svg.appendChild(el('text', { x: ox + (anchor === 'end' ? -4 : 4), y: H - 16,
-      'text-anchor': anchor, class: 'sc-tick', 'font-weight': 700 },
-      isRent ? `suburb median $${own}` : `suburb total ${own.toLocaleString()}`));
-  }
-
-  const maxLabel = x0 - 12;
-  labels.forEach(t => {
-    if (t.getComputedTextLength() <= maxLabel) return;
-    const full = t.textContent;
-    let a = 1, b = full.length;
-    while (a < b) {
-      const m = Math.ceil((a + b) / 2);
-      t.textContent = full.slice(0, m) + '…';
-      if (t.getComputedTextLength() <= maxLabel) a = m; else b = m - 1;
-    }
-    t.textContent = full.slice(0, a) + '…';
-  });
-
-  // The spread across the parts is the whole point of opening this up, so say
-  // it in numbers, and name the other dataset's disagreement while we are here.
-  const money = v => (isRent ? '$' : '') + v.toLocaleString();
-  const spread = shown.length > 1
-    ? `${money(Math.min(...shown.map(r => r.v)))}\u2013${money(Math.max(...shown.map(r => r.v)))}`
-      + ` across ${shown.length}`
-    : 'a single area';
-  const other = isRent ? (src.c || []).length : (src.r || []).length;
-  const mine = isRent ? (src.r || []).length : (src.c || []).length;
-  document.getElementById('inside-sub').textContent =
-    `${spread} · ${isRent ? 'MBIE statistical areas' : 'NZ Police areas'}`
-    + (other && other !== mine
-        ? ` · ${isRent ? 'safety' : 'rent'} divides it into ${other} instead`
-        : '');
+  return rows.sort((a, b) => a.v - b.v);
 }
 
 // ── REGIONS SIDE BY SIDE ──
@@ -1551,12 +1424,18 @@ function drawBars() {
 
 function drawRanking(kind) {
   const isRent = kind === 'rent';
-  const rows = unitBarRows(isRent);
+  // The third level opens this ranking up: instead of the suburbs on the map,
+  // it lists the source areas the selected suburb's own figure is made of.
+  // Only one ranking can open, because only one dataset was chosen — the other
+  // keeps ranking suburbs, since its areas are a different geography.
+  const src = selected ? SOURCE_AREAS[selected] : null;
+  const inside = sourceView === kind && src;
+  const rows = inside ? insideRows(kind) : unitBarRows(isRent);
 
-  if (isRent) {
-    document.getElementById('rank-rent-title').textContent =
-      rentStat === 'mean' ? 'Mean rent ranking' : 'Rent ranking';
-  }
+  document.getElementById(isRent ? 'rank-rent-title' : 'rank-safety-title').textContent =
+    inside ? `Inside ${selected} \u00B7 ${isRent ? 'rent' : 'safety'}`
+    : isRent ? (rentStat === 'mean' ? 'Mean rent ranking' : 'Rent ranking')
+    : 'Safety ranking';
   const subId = isRent ? 'rank-rent-sub' : 'rank-safety-sub';
 
   // Six regions in a tile sized for 143 suburbs is mostly white space, so the
@@ -1565,7 +1444,9 @@ function drawRanking(kind) {
   const svgEl = document.getElementById('chart-rank-' + kind);
   svgEl.closest('.tile').style.gridRow = rows.length > 8 ? 'span 2' : 'span 1';
 
-  const p = prepSvg('chart-rank-' + kind, BAR_TOP + rows.length * BAR_ROW + 10);
+  // Extra room at the foot when opened up, for the suburb-figure caption.
+  const p = prepSvg('chart-rank-' + kind,
+    BAR_TOP + rows.length * BAR_ROW + (inside && isRent ? 28 : 10));
   if (!p) return;
   const { svg, W, H } = p;
 
@@ -1576,7 +1457,7 @@ function drawRanking(kind) {
     return;
   }
 
-  const x0 = BAR_LABEL_W(), x1 = W - BAR_PAD_R();
+  const x0 = inside ? 156 : BAR_LABEL_W(), x1 = W - BAR_PAD_R();
   const CLIP_GAP = 7;
   const span = x1 - x0 - CLIP_GAP;
   const pct = (vals, q) => {
@@ -1599,10 +1480,11 @@ function drawRanking(kind) {
   const scale = v => Math.max(0, Math.min(v, hi) - lo) / (hi - lo) * span;
 
   svg.appendChild(el('text', { x: 0, y: 14, class: 'sc-axis-label' },
-    isRent ? '$ / WEEK' : 'PER 1,000'));
+    isRent ? '$ / WEEK' : inside ? 'VICTIMS 2025' : 'PER 1,000'));
   for (let v = Math.ceil((lo + step / 2) / step) * step; v <= hi; v += step) {
     const gx = x0 + scale(v);
-    svg.appendChild(el('line', { x1: gx, y1: BAR_TOP - 6, x2: gx, y2: H - 6, class: 'sc-grid' }));
+    svg.appendChild(el('line', { x1: gx, y1: BAR_TOP - 6, x2: gx, y2: H - (inside && isRent ? 22 : 6),
+      class: 'sc-grid' }));
     svg.appendChild(el('text', { x: gx, y: 14, 'text-anchor': 'middle', class: 'sc-tick' },
       isRent ? '$' + v : v.toLocaleString()));
   }
@@ -1660,13 +1542,19 @@ function drawRanking(kind) {
                                'fill-opacity': over ? 0.45 : 1 },
       isRent ? '$' + r.v : Math.round(r.v).toLocaleString()));
 
-    const target = r.d._parent || r.d.suburb;
-    g.addEventListener('mouseenter', e => {
-      highlightMarker(target, true);
-      showTip(r.d, e.clientX, e.clientY);
-    });
-    g.addEventListener('mouseleave', () => { highlightMarker(target, false); hideTip(); });
-    g.addEventListener('click', () => selectSuburb(target, true));
+    if (inside) {
+      // Source areas have no coordinates, so there is nothing on the map to
+      // highlight and nowhere to drill; a native title carries the detail.
+      g.appendChild(el('title', {}, r.n
+        ? `${r.d.suburb}\n${r.n.toLocaleString()} active bonds` : r.d.suburb));
+    } else {
+      g.addEventListener('mouseenter', e => {
+        highlightMarker(r.d.suburb, true);
+        showTip(r.d, e.clientX, e.clientY);
+      });
+      g.addEventListener('mouseleave', () => { highlightMarker(r.d.suburb, false); hideTip(); });
+      g.addEventListener('click', () => selectSuburb(r.d.suburb, true));
+    }
     svg.appendChild(g);
   });
 
@@ -1682,6 +1570,35 @@ function drawRanking(kind) {
     }
     t.textContent = full.slice(0, lo2) + '\u2026';
   });
+
+  if (inside) {
+    const unit = units().find(d => d.suburb === selected);
+    // Rent gets a reference line: the suburb figure is an average of these
+    // areas, so it lands among them and showing where is the point. Crime does
+    // not: the areas SUM to the suburb figure, so a line for it would sit past
+    // every bar by construction. That number goes in the caption instead.
+    const own = isRent && unit ? getRent(unit) : null;
+    if (own != null && own >= lo && own <= hi) {
+      const ox = x0 + scale(own);
+      svg.appendChild(el('line', { x1: ox, y1: BAR_TOP - 6, x2: ox, y2: H - 22,
+        stroke: '#0F1C18', 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }));
+      const end = ox > W - 120;
+      svg.appendChild(el('text', { x: ox + (end ? -4 : 4), y: H - 10,
+        'text-anchor': end ? 'end' : 'start', class: 'sc-tick', 'font-weight': 700 },
+        `suburb figure $${own}`));
+    }
+    const money = v => (isRent ? '$' : '') + v.toLocaleString();
+    const other = (isRent ? (src.c || []) : (src.r || [])).length;
+    document.getElementById(subId).textContent =
+      (rows.length > 1
+        ? `${money(rows[0].v)}\u2013${money(rows[rows.length - 1].v)} across ${rows.length} `
+        : '1 ')
+      + (isRent ? 'MBIE areas' : 'police areas')
+      + (!isRent && unit && unit.crime_2025 != null
+          ? `, ${unit.crime_2025.toLocaleString()} in total` : '')
+      + (other ? ` · ${isRent ? 'safety' : 'rent'} divides it into ${other}` : '');
+    return;
+  }
 
   const noun = granularity === 'region' ? 'regions' : 'suburbs';
   document.getElementById(subId).textContent =
@@ -1837,7 +1754,7 @@ function setGranularity(g, into) {
 // honestly hold a rent figure and a crime figure at once, so the reader picks.
 const AREA_NOTE = { region: 'Six compass regions, drawn as solid blocks.' };
 const REGION_OF = Object.fromEntries(SUBURB_DATA.map(d => [d.suburb, d.region]));
-let sourceView = null;    // null | 'rent' | 'crime' — the third level
+let sourceView = null;    // null | 'rent' | 'safety' — which ranking opens up
 
 function setRegion(r) {
   sourceView = null;
@@ -1857,9 +1774,7 @@ function setSuburbFilter(s) {
 function setSource(v) {
   sourceView = v === 'none' ? null : v;
   syncAreaSelects();
-  drawInside();
-  // The tile lands wherever the grid puts it, which can be below the fold.
-  if (sourceView) document.getElementById('tile-inside').scrollIntoView({ block: 'nearest' });
+  drawChart();
 }
 
 // Every select says what is actually on screen. The region select names the
@@ -1902,7 +1817,7 @@ function syncAreaSelects() {
         : !selected ? '\u2014  pick a suburb first' : '\u2014  no source data'}</option>`
     : '<option value="none">Suburb figures only</option>'
       + (nR ? `<option value="rent">Rent \u00B7 ${nR} MBIE area${nR === 1 ? '' : 's'}</option>` : '')
-      + (nC ? `<option value="crime">Safety \u00B7 ${nC} police area${nC === 1 ? '' : 's'}</option>` : '');
+      + (nC ? `<option value="safety">Safety \u00B7 ${nC} police area${nC === 1 ? '' : 's'}</option>` : '');
   psel.value = open && sourceView ? sourceView : 'none';
 
   // The note is the hint. At the third level it says what opening a suburb

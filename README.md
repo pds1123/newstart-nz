@@ -9,7 +9,7 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter, and the source areas inside one suburb |
+| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
 | `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `frontend/rent_dashboard.html` | Plotly dashboard of 2025 market rent trends |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
@@ -46,7 +46,8 @@ crime counts, 170/172 have population. Suburbs with no data are shown as such ra
 dropped.
 
 Those folds are not tidy, so the page lets you open one up. Picking a suburb and then a
-dataset lists the source areas behind its figure: Glen Innes reads $517 for a 2-bedroom
+dataset turns that dataset's ranking into a list of the source areas behind the suburb's
+figure: Glen Innes reads $517 for a 2-bedroom
 house, which is $194 in one MBIE area and $618 in the other. The two datasets have to be
 viewed one at a time, because 74 of the 123 suburbs carrying both are built from a
 different *number* of source areas on each side — there is no row that could honestly hold
