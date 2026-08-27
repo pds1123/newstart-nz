@@ -764,10 +764,11 @@ function showRawTip(r, isRent, x, y) {
   tipFor = null;                       // raw areas have no suburb-level jump target
   document.getElementById('tt-name').textContent = r.d.suburb;
   const rentEl = document.getElementById('tt-rent');
-  rentEl.textContent = isRent ? `$${r.v}/wk` : '—';
+  rentEl.textContent = isRent
+    ? (r.lq && r.uq ? `$${r.v}  ·  ${r.lq}–${r.uq}` : `$${r.v}/wk`) : '—';
   rentEl.className = 'tt-val ' + (isRent ? 'rent' : 'na');
   const crimeEl = document.getElementById('tt-crime');
-  crimeEl.textContent = isRent ? '—' : r.v.toLocaleString() + ' incidents';
+  crimeEl.textContent = isRent ? '—' : `${Math.round(r.v)} per 1,000 residents`;
   crimeEl.className = 'tt-val' + (isRent ? ' na' : '');
   document.getElementById('tt-rent-jump').disabled = true;
   document.getElementById('tt-safety-jump').disabled = true;
@@ -1059,7 +1060,7 @@ function drawScatter() {
 // ── BAR CHART (Rent view / Safety view) ──
 const BAR_ROW = 19, BAR_TOP = 26;
 // Rent labels carry a median plus a range, so they need more room than counts.
-const BAR_PAD_R = () => (mapMode === 'rent' ? 104 : 52);
+const BAR_PAD_R = () => 56;
 const BAR_LABEL_W = () => (granularity === 'raw' ? 152 : 104);
 
 
@@ -1101,6 +1102,16 @@ function rawBarRows(isRent) {
   return rows.sort((a, b) => a.v - b.v);
 }
 
+// Round an axis maximum up to something a reader can hold in their head.
+function niceCeil(v) {
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  return Math.ceil(v / (mag / 2)) * (mag / 2);
+}
+function niceStep(max) {
+  const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  return [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
+}
+
 function drawBars() {
   const svg = document.getElementById('scatter');
   const box = svg.parentElement.getBoundingClientRect();
@@ -1124,18 +1135,39 @@ function drawBars() {
   }
 
   const x0 = BAR_LABEL_W(), x1 = W - BAR_PAD_R();
-  const maxV = Math.max(...rows.map(r => r.v));
-  const scale = v => (v / maxV) * (x1 - x0);
 
-  svg.appendChild(el('text', { x: x0, y: 14, class: 'sc-axis-label' },
-    isRent ? 'WEEKLY RENT ($)' : 'VICTIMISATIONS PER 1,000'));
+  // Rent is drawn as a box plot: the interquartile box with the median inside
+  // it. Two suburbs can share a median and be nothing alike — one letting a
+  // narrow band of similar places, the other pooling $200 flats with $700
+  // houses — and a bar cannot show that while a box can. Safety has no spread
+  // to show, so it stays a bar.
+  const boxes = isRent && rows.some(r => r.lq && r.uq);
+  const spread = rows.map(r => (boxes ? (r.uq || r.v) : r.v)).sort((a, b) => a - b);
+  // Crime per capita is long-tailed: a handful of commercial centres run 20x the
+  // residential suburbs, and scaling to them squashes everything else into a
+  // sliver. Cut the axis at the 95th percentile and flag what runs past it.
+  const maxV = niceCeil(spread[Math.min(spread.length - 1, Math.floor(spread.length * 0.95))]);
+  const CLIP_GAP = 7;   // room for the over-scale chevron
+  const scale = v => Math.min(v, maxV) / maxV * (x1 - x0 - CLIP_GAP);
+
+  svg.appendChild(el('text', { x: 0, y: 14, class: 'sc-axis-label' },
+    isRent ? '$ / WEEK' : 'PER 1,000'));
+
+  // Grid behind the boxes, so a reader can place a value without a ruler.
+  const step = niceStep(maxV);
+  for (let v = step; v <= maxV; v += step) {
+    const gx = x0 + scale(v);
+    svg.appendChild(el('line', { x1: gx, y1: BAR_TOP - 6, x2: gx, y2: H - 6, class: 'sc-grid' }));
+    svg.appendChild(el('text', { x: gx, y: 14, 'text-anchor': 'middle', class: 'sc-tick' },
+      isRent ? '$' + v : v.toLocaleString()));
+  }
 
   const labels = [];
   rows.forEach((r, i) => {
     const y = BAR_TOP + i * BAR_ROW;
-    const w = Math.max(1, scale(r.v));
     const isSel = selected === r.d.suburb;
     const over = isRent && r.v > currentBudget;
+    const colour = isRent ? rentColor(r.v) : safetyColor(r.v);
 
     const g = el('g', { class: 'bar-g' });
     g.dataset.suburb = r.d.suburb;
@@ -1150,18 +1182,40 @@ function drawBars() {
     }, r.d.suburb);
     g.appendChild(label);
     labels.push(label);
-    g.appendChild(el('rect', {
-      x: x0, y: y + 2, width: w, height: BAR_ROW - 7, rx: 2,
-      fill: isRent ? rentColor(r.v) : safetyColor(r.v),
-      'fill-opacity': over ? 0.35 : 1,
-    }));
-    // Rent bars carry the interquartile range beside the median, because the
-    // median alone says nothing about the spread inside a suburb.
-    const valueText = isRent
-      ? (r.lq && r.uq ? `$${r.v}   ${r.lq}–${r.uq}` : `$${r.v}`)
-      : Math.round(r.v).toLocaleString();
+
+    const mid = y + (BAR_ROW - 3) / 2;
+    if (boxes && r.lq && r.uq) {
+      const bx = x0 + scale(r.lq), bw = Math.max(2, scale(r.uq) - scale(r.lq));
+      // Whisker from zero to the box, so the absolute level stays readable.
+      g.appendChild(el('line', {
+        x1: x0, y1: mid, x2: bx, y2: mid,
+        stroke: colour, 'stroke-width': 1, 'stroke-opacity': over ? 0.25 : 0.45,
+      }));
+      g.appendChild(el('rect', {
+        x: bx, y: y + 3, width: bw, height: BAR_ROW - 9, rx: 2,
+        fill: colour, 'fill-opacity': over ? 0.3 : 0.75,
+      }));
+      g.appendChild(el('line', {
+        x1: x0 + scale(r.v), y1: y + 2, x2: x0 + scale(r.v), y2: y + BAR_ROW - 5,
+        stroke: '#0F1C18', 'stroke-width': 1.6, 'stroke-opacity': over ? 0.3 : 0.8,
+      }));
+    } else {
+      g.appendChild(el('rect', {
+        x: x0, y: y + 3, width: Math.max(1, scale(r.v)), height: BAR_ROW - 9, rx: 2,
+        fill: colour, 'fill-opacity': over ? 0.35 : 1,
+      }));
+    }
+    if ((boxes ? (r.uq || r.v) : r.v) > maxV) {
+      const cx = x1 - CLIP_GAP + 2;
+      [0, 4].forEach(dx => g.appendChild(el('path', {
+        d: `M${cx + dx} ${y + 4}L${cx + dx + 3} ${mid}L${cx + dx} ${y + BAR_ROW - 6}`,
+        fill: 'none', stroke: colour, 'stroke-width': 1.5, 'stroke-linecap': 'round',
+      })));
+    }
+
+    const valueText = isRent ? `$${r.v}` : Math.round(r.v).toLocaleString();
     g.appendChild(el('text', {
-      x: x0 + w + 5, y: y + 11, class: 'bar-val',
+      x: x1 + 6, y: y + 11, class: 'bar-val',
     }, valueText));
 
     const target = r.d._parent || r.d.suburb;
