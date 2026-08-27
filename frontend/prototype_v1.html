@@ -432,7 +432,13 @@ input[type=range]::-webkit-slider-thumb {
       </div>
 
       <div class="sidebar-section" id="legend-section">
-        <div class="filter-label" id="legend-title">Legend</div>
+        <div class="filter-label">Map colour</div>
+        <div class="seg seg-wide" id="metric-seg">
+          <button class="seg-btn" data-metric="rent" onclick="setMapMode('rent')">Rent</button>
+          <button class="seg-btn" data-metric="safety" onclick="setMapMode('safety')">Safety</button>
+          <button class="seg-btn active" data-metric="combined" onclick="setMapMode('combined')">Combined</button>
+        </div>
+        <div class="filter-label" id="legend-title" style="margin-top:14px">Legend</div>
         <div class="q-legend" id="q-legend"></div>
         <div class="biv-legend" id="biv-legend">
           <div class="biv-grid" id="biv-grid"></div>
@@ -504,11 +510,6 @@ input[type=range]::-webkit-slider-thumb {
         <div class="tile-head">
           <span class="tile-title">Map</span>
           <span class="tile-sub" id="map-sub"></span>
-          <div class="seg" id="metric-seg">
-            <button class="seg-btn" data-metric="rent" onclick="setMapMode('rent')">Rent</button>
-            <button class="seg-btn" data-metric="safety" onclick="setMapMode('safety')">Safety</button>
-            <button class="seg-btn active" data-metric="combined" onclick="setMapMode('combined')">Combined</button>
-          </div>
         </div>
         <div class="tile-body"><div id="map"></div></div>
       </section>
@@ -1892,20 +1893,41 @@ function syncAreaSelects() {
   ssel.value = !atRegion && selected && drawn.includes(selected) ? selected : 'all';
 
   const src = SOURCE_AREAS[selected] || {};
+  const nR = (src.r || []).length, nC = (src.c || []).length;
   const psel = document.getElementById('source-select');
-  const open = !atRegion && selected && (src.r || src.c);
+  const open = !atRegion && selected && (nR || nC);
   psel.disabled = !open;
   psel.innerHTML = !open
-    ? '<option value="none">\u2014</option>'
+    ? `<option value="none">${atRegion ? '\u2014  pick a region first'
+        : !selected ? '\u2014  pick a suburb first' : '\u2014  no source data'}</option>`
     : '<option value="none">Suburb figures only</option>'
-      + (src.r ? `<option value="rent">Rent \u00B7 ${src.r.length} MBIE area${src.r.length === 1 ? '' : 's'}</option>` : '')
-      + (src.c ? `<option value="crime">Safety \u00B7 ${src.c.length} police area${src.c.length === 1 ? '' : 's'}</option>` : '');
+      + (nR ? `<option value="rent">Rent \u00B7 ${nR} MBIE area${nR === 1 ? '' : 's'}</option>` : '')
+      + (nC ? `<option value="crime">Safety \u00B7 ${nC} police area${nC === 1 ? '' : 's'}</option>` : '');
   psel.value = open && sourceView ? sourceView : 'none';
 
-  document.getElementById('gran-note').textContent =
-    atRegion ? AREA_NOTE.region
-    : selected ? `${selected}, in ${REGION_OF[selected]}.`
-    : `The ${scope} region, suburb by suburb.`;
+  // The note is the hint. At the third level it says what opening a suburb
+  // would show and, once opened, why the other dataset is not on the same rows.
+  const areas = (n, what) => `${n} ${what} area${n === 1 ? '' : 's'}`;
+  let note;
+  if (atRegion) note = AREA_NOTE.region;
+  else if (!selected) note = `The ${scope} region, suburb by suburb.`;
+  else if (!open) note = `${selected} has no source-area detail.`;
+  else if (!sourceView) {
+    note = nR && nC
+      ? `${selected}'s figures come from ${areas(nR, 'MBIE')} and ${areas(nC, 'police')}. `
+        + 'Open one to see the spread the average hides.'
+      : `${selected}'s figures come from ${nR ? areas(nR, 'MBIE') : areas(nC, 'police')}. `
+        + 'Open it to see the spread the average hides.';
+  } else {
+    const mine = sourceView === 'rent' ? nR : nC;
+    const other = sourceView === 'rent' ? nC : nR;
+    note = `${areas(mine, sourceView === 'rent' ? 'MBIE statistical' : 'NZ Police')}. `
+      + (other
+          ? `${sourceView === 'rent' ? 'Safety' : 'Rent'} divides ${selected} into ${other} instead — `
+            + 'the two datasets do not share boundaries, so they cannot sit on the same rows.'
+          : `The other dataset has no areas here.`);
+  }
+  document.getElementById('gran-note').textContent = note;
 }
 
 
