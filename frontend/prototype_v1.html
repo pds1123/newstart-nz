@@ -815,39 +815,23 @@ function syncLabelVisibility() {
 }
 map.on('zoomend', syncLabelVisibility);
 
-// Population spans about 11 to 55,000, so the square root keeps the largest
-// suburbs from swamping everything else — dot area, not radius, tracks size.
-let POP_MAX = 1;
+// Marker size is how many tenancies are active — how much choice a renter has
+// there, which is closer to their question than how many people live there.
+// It follows the filter: switch to Room and only suburbs that actually let
+// rooms stay large. Square root so area rather than radius tracks the count.
+let SAMPLE_MAX = 1;
+function recomputeSampleMax() {
+  SAMPLE_MAX = Math.max(1, ...units().map(d => getSample(d) || 0));
+}
 function markerRadius(d) {
-  const p = d.population || 0;
-  return 4 + Math.sqrt(p / POP_MAX) * 9;
+  return 4 + Math.sqrt((getSample(d) || 0) / SAMPLE_MAX) * 9;
 }
 
 const GEO_BY_NAME = {};
 let shapes = {};
-let outline = null;   // boundary traced under the pointer at suburb granularity
-
-// Circles say where a suburb is; its actual shape is worth seeing when you
-// single one out, so LINZ's boundary is traced on hover and selection.
-function traceOutline(name) {
-  clearOutline();
-  const rings = GEO_BY_NAME[name];
-  if (!rings || granularity === 'region') return;
-  outline = L.polygon(rings, {
-    color: '#0F1C18', weight: 1.6, opacity: 0.85,
-    fill: true, fillColor: '#0F1C18', fillOpacity: 0.06,
-    interactive: false,
-  }).addTo(map);
-}
-
-function clearOutline() {
-  if (outline) { map.removeLayer(outline); outline = null; }
-}
-
 function buildMarkers() {
   Object.values(markers).forEach(m => { map.removeLayer(m.circle); map.removeLayer(m.label); });
   Object.values(shapes).forEach(s => map.removeLayer(s));
-  clearOutline();
   markers = {}; shapes = {};
 
   const drawn = new Set();
@@ -919,14 +903,12 @@ function buildMarkers() {
     if (!polys.length) {
       circle.on('mouseover', function (e) {
         this.setStyle({ fillOpacity: over ? 0.5 : 1, weight: 2.5 });
-        traceOutline(d.suburb);
         highlightDot(d.suburb, true);
         showTip(d, e.originalEvent.clientX, e.originalEvent.clientY);
       });
       circle.on('mouseout', function () {
         this.setStyle({ fillOpacity: over ? 0.3 : 0.85,
                         weight: selected === d.suburb ? 2.5 : 1.5 });
-        if (selected) traceOutline(selected); else clearOutline();
         highlightDot(d.suburb, false);
         hideTip();
       });
@@ -950,7 +932,6 @@ function buildMarkers() {
   });
 
   syncLabelVisibility();
-  if (selected && granularity !== 'region') traceOutline(selected);
 }
 
 // ── SCATTER ──
@@ -1012,7 +993,9 @@ function drawScatter() {
   const sx = v => x0 + (v - rLo)/(rHi - rLo) * (x1 - x0);
   const sy = v => y0 + (Math.log(Math.max(1,v)) - lgLo)/(lgHi - lgLo) * (y1 - y0);
   // Region dots scale by how many suburbs they contain; suburb dots by bonds lodged.
-  pts.forEach(p => { p.size = granularity === 'region' ? (p.d.memberCount||1) : (p.n||1); });
+    // Same measure as the map markers, so the two views agree.
+  pts.forEach(p => { p.size = granularity === 'region'
+      ? (p.d.memberCount || 1) : (p.n || 1); });
   const nMax = Math.max(...pts.map(p => p.size));
   const sr = n => 4 + Math.sqrt((n||1)/nMax) * 9;
   scScales = { sx, sy, sr };
@@ -1070,7 +1053,7 @@ function drawScatter() {
 
   document.getElementById('scatter-sub').textContent = granularity === 'region'
     ? `${pts.length} regions · dot size = suburbs covered`
-    : `${pts.length} suburbs · dot size = population`;
+    : `${pts.length} suburbs · dot size = rentals available`;
 }
 
 // ── BAR CHART (Rent view / Safety view) ──
@@ -1285,7 +1268,9 @@ function updateKPI() {
     ? `${choice.n.toLocaleString()} rentals` : '—';
 
   document.getElementById('map-sub').textContent =
-    `${units().length} ${granularity === 'region' ? 'regions' : 'suburbs'} · ${currentBed} bed · ${currentDwell}`;
+    `${units().length} ${granularity === 'region' ? 'regions' : 'suburbs'} · `
+    + `${currentBed} bed · ${currentDwell}`
+    + (granularity === 'region' ? '' : ' · size = rentals available');
 }
 
 function updateQuadLegend() {
@@ -1377,6 +1362,7 @@ function refresh() {
   }
   updateToolbarNote();
   computeMedians();
+  recomputeSampleMax();
   buildMarkers();
   drawChart();
   updateKPI();
@@ -1511,7 +1497,6 @@ SUBURB_GEO.features.forEach(f => {
   GEO_BY_NAME[f.properties.name] =
     f.geometry.coordinates.map(poly => poly.map(ring => ring.map(([x, y]) => [y, x])));
 });
-POP_MAX = Math.max(...SUBURB_DATA.map(d => d.population || 0), 1);
 REGION_DATA = buildRegions();
 syncGranStops();
 setGranularity('region');
