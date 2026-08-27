@@ -422,7 +422,7 @@ input[type=range]::-webkit-slider-thumb {
           <dd>
             NZ Police victimisations
             <span class="src-period">Jan – Dec 2025</span>
-            <span class="src-note">Absolute counts, not per capita</span>
+            <span class="src-note">Rates per 1,000 residents (LINZ population)</span>
           </dd>
         </dl>
         <div class="src-warn">
@@ -618,6 +618,15 @@ function getRent(d) {
   return (d.rent[currentDwell]||{})[currentBed] || null;
 }
 
+// Victimisations per 1,000 residents. Absolute counts are not comparable
+// across areas of wildly different size — a region holding one suburb posts
+// the lowest total by construction. Rates are what the rankings, colours and
+// quadrants use; the raw count is still shown in the tooltip.
+function getCrimeRate(d) {
+  if (d.crime_2025 == null || !d.population) return null;
+  return d.crime_2025 / d.population * 1000;
+}
+
 function getSample(d) {
   if (currentDwell === 'All') {
     const vals = WHOLE.map(dw => (d.n[dw]||{})[currentBed]).filter(v => v);
@@ -633,7 +642,7 @@ let medRent = 0, medCrime = 0;
 let rentLo = 0, rentHi = 1;
 function computeMedians() {
   const rents  = units().map(getRent).filter(v => v != null).sort((a,b)=>a-b);
-  const crimes = units().map(d=>d.crime_2025).filter(v => v != null).sort((a,b)=>a-b);
+  const crimes = units().map(getCrimeRate).filter(v => v != null).sort((a,b)=>a-b);
   medRent  = rents.length  ? rents[Math.floor(rents.length/2)]   : 0;
   medCrime = crimes.length ? crimes[Math.floor(crimes.length/2)] : 0;
   rentLo = rents.length ? rents[0] : 0;
@@ -641,7 +650,7 @@ function computeMedians() {
 }
 
 function quadOf(d) {
-  const r = getRent(d), c = d.crime_2025;
+  const r = getRent(d), c = getCrimeRate(d);
   if (r == null || c == null) return 'none';
   const cheap = r < medRent, safe = c < medCrime;
   if (cheap && safe)   return 'best';
@@ -668,11 +677,12 @@ function rentColor(v) {
 }
 function safetyColor(v) {
   if (v == null) return QUAD.none.color;
-  return 'rgb(' + lerpColor(SAFE_STOPS, Math.log(v+1)/Math.log(5601)).join(',') + ')';
+  // Rates span roughly 2 to 3,000 per 1,000, so the ramp stays log-scaled.
+  return 'rgb(' + lerpColor(SAFE_STOPS, Math.log(v+1)/Math.log(3001)).join(',') + ')';
 }
 function colorOf(d) {
   if (mapMode === 'rent')   return rentColor(getRent(d));
-  if (mapMode === 'safety') return safetyColor(d.crime_2025);
+  if (mapMode === 'safety') return safetyColor(getCrimeRate(d));
   return QUAD[quadOf(d)].color;
 }
 
@@ -696,8 +706,11 @@ function showTip(d, clientX, clientY) {
   rentEl.className = 'tt-val ' + (rent ? 'rent' : 'na');
 
   const crimeEl = document.getElementById('tt-crime');
-  crimeEl.textContent = d.crime_2025 != null ? d.crime_2025.toLocaleString() + ' incidents' : 'No data';
-  crimeEl.className = 'tt-val' + (d.crime_2025 == null ? ' na' : '');
+  const rate = getCrimeRate(d);
+  crimeEl.textContent = rate != null
+    ? `${Math.round(rate)}/1k · ${d.crime_2025.toLocaleString()} total`
+    : (d.crime_2025 != null ? `${d.crime_2025.toLocaleString()} total · no population` : 'No data');
+  crimeEl.className = 'tt-val' + (rate == null ? ' na' : '');
 
   const sEl = document.getElementById('tt-sample');
   sEl.textContent = sample ? sample.toLocaleString() + ' bonds' : 'No data';
@@ -768,9 +781,12 @@ function jumpTo(mode) {
 // Zoom sits bottom-right so it clears the KPI bar overlaying the top of the map.
 const map = L.map('map', { center: [-36.87,174.78], zoom: 11, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OSM &copy; CARTO · Rent: MBIE to Jun 2026 · Crime: NZ Police 2025',
-  subdomains: 'abcd', maxZoom: 19
+// OpenStreetMap's own tiles need no key; CARTO's light basemap started
+// watermarking "API KEY REQUIRED" over the map.
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap · Boundaries: LINZ CC BY 4.0 · '
+             + 'Rent: MBIE to Jun 2026 · Crime: NZ Police 2025',
+  maxZoom: 19
 }).addTo(map);
 map.attributionControl.setPrefix('');
 
@@ -895,7 +911,7 @@ function drawScatter() {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
   const pts = units()
-    .map(d => ({ d, rent: getRent(d), crime: d.crime_2025, n: getSample(d) }))
+    .map(d => ({ d, rent: getRent(d), crime: getCrimeRate(d), n: getSample(d) }))
     .filter(p => p.rent != null && p.crime != null);
 
   const x0 = SC_PAD.l, x1 = W - SC_PAD.r;
@@ -944,7 +960,7 @@ function drawScatter() {
     svg.appendChild(el('text', { x:sx(v), y:y1+15, 'text-anchor':'middle', class:'sc-tick' }, '$'+v));
   }
   // Y ticks (crime, log)
-  [10,50,200,1000,5000].filter(v => v >= cMin*0.6 && v <= cMax*1.5).forEach(v => {
+  [1,5,20,100,500,2000].filter(v => v >= cMin*0.6 && v <= cMax*1.5).forEach(v => {
     svg.appendChild(el('line', { x1:x0, y1:sy(v), x2:x1, y2:sy(v), class:'sc-grid' }));
     svg.appendChild(el('text', { x:x0-8, y:sy(v)+3, 'text-anchor':'end', class:'sc-tick' }, v.toLocaleString()));
   });
@@ -967,7 +983,7 @@ function drawScatter() {
   // Axis labels
   svg.appendChild(el('text', { x:(x0+x1)/2, y:H-8, 'text-anchor':'middle', class:'sc-axis-label' }, 'Weekly Rent ($)'));
   const yl = el('text', { x:14, y:(y0+y1)/2, 'text-anchor':'middle', class:'sc-axis-label',
-                          transform:`rotate(-90 14 ${(y0+y1)/2})` }, 'Safer  ←   Incidents   →  Riskier');
+                          transform:`rotate(-90 14 ${(y0+y1)/2})` }, 'Safer  \u2190   Per 1,000 residents   \u2192  Riskier');
   svg.appendChild(yl);
 
   // Dots
@@ -1016,7 +1032,7 @@ const BAR_LABEL_W = () => (granularity === 'raw' ? 152 : 104);
 // Rows at region or suburb granularity — the aggregated values the map shows.
 function unitBarRows(isRent) {
   return units()
-    .map(d => ({ d, v: isRent ? getRent(d) : d.crime_2025, n: getSample(d) }))
+    .map(d => ({ d, v: isRent ? getRent(d) : getCrimeRate(d), n: getSample(d) }))
     .filter(r => r.v != null)
     .sort((a, b) => a.v - b.v);
 }
@@ -1074,7 +1090,7 @@ function drawBars() {
   const scale = v => (v / maxV) * (x1 - x0);
 
   svg.appendChild(el('text', { x: x0, y: 14, class: 'sc-axis-label' },
-    isRent ? 'WEEKLY RENT ($)' : 'INCIDENTS 2025'));
+    isRent ? 'WEEKLY RENT ($)' : 'VICTIMISATIONS PER 1,000'));
 
   const labels = [];
   rows.forEach((r, i) => {
@@ -1192,20 +1208,22 @@ function updateKPI() {
   document.getElementById('kpi-cheap').textContent = cheap ? cheap.d.suburb : '—';
   document.getElementById('kpi-cheap-sub').textContent = cheap ? `$${cheap.r}/wk` : 'No data';
 
-  const safe = units().filter(d=>d.crime_2025!=null).sort((a,b)=>a.crime_2025-b.crime_2025)[0];
-  document.getElementById('kpi-safe').textContent = safe ? safe.suburb : '—';
-  document.getElementById('kpi-safe-sub').textContent = safe ? `${safe.crime_2025.toLocaleString()} incidents` : '—';
+  const safe = units().map(d=>({d, r:getCrimeRate(d)})).filter(o=>o.r!=null)
+                      .sort((a,b)=>a.r-b.r)[0];
+  document.getElementById('kpi-safe').textContent = safe ? safe.d.suburb : '—';
+  document.getElementById('kpi-safe-sub').textContent = safe
+    ? `${Math.round(safe.r)} per 1,000 residents` : '—';
 
   // Best value = furthest below both medians, measured as a share of each median
   // so rent and incident counts stay comparable.
   const best = units()
-    .map(d => ({ d, rent: getRent(d), crime: d.crime_2025 }))
+    .map(d => ({ d, rent: getRent(d), crime: getCrimeRate(d) }))
     .filter(r => quadOf(r.d) === 'best')
     .map(r => ({ ...r, margin: (1 - r.rent/medRent) + (1 - r.crime/medCrime) }))
     .sort((a,b) => b.margin - a.margin)[0];
   document.getElementById('kpi-best').textContent = best ? best.d.suburb : '—';
   document.getElementById('kpi-best-sub').textContent = best
-    ? `$${best.rent}/wk · ${best.crime.toLocaleString()} inc.` : 'None in this filter';
+    ? `$${best.rent}/wk · ${Math.round(best.crime)}/1k` : 'None in this filter';
 
   document.getElementById('map-sub').textContent =
     `${units().length} ${granularity === 'region' ? 'regions' : 'suburbs'} · ${currentBed} bed · ${currentDwell}`;

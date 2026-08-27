@@ -52,8 +52,28 @@ and answer the wrong question for someone asking what they can actually rent.
 ### Crime — NZ Police
 
 `data/auckland_crime_by_suburb_2025_405.csv` — 405 police areas, 2025 victimisation counts,
-two columns (`suburb`, `total_crimes_2025`). Absolute counts, not rates. See
-[Limitations](#limitations).
+two columns (`suburb`, `total_crimes_2025`).
+
+The counts are absolute, so the frontend divides by LINZ population to get **victimisations
+per 1,000 residents**, and every ranking, colour and quadrant uses the rate. Absolute counts
+are not comparable across areas of wildly different size — a region holding one suburb posts
+the lowest total by construction, which is what made the CBD read as Auckland's safest area.
+The raw count is still shown alongside the rate in the tooltip.
+
+### Boundaries and population — LINZ
+
+[NZ Suburbs and Localities](https://data.linz.govt.nz/layer/113764-nz-suburbs-and-localities/),
+CC BY 4.0. *Sourced from the LINZ Data Service and licensed for reuse under CC BY 4.0.*
+
+This dataset defines the suburb list itself — the names people write on addresses, which is
+what the audience uses — plus polygon boundaries and Stats NZ population estimates. Filtering
+to `type = Suburb` and `major_name = Auckland` gives the 172 urban suburbs; the rest of the
+export is coastal bays, islands, lakes and outer localities.
+
+`scraper/build_linz_suburbs.py` writes `data/linz_suburbs.geojson`. LINZ captures urban
+boundaries at 0.1–1 m, which inlines at 12 MB, so rings are thinned with Douglas-Peucker to
+about 22 m and rounded to four decimal places — 306 KB, and invisible at the zoom levels this
+map uses. Centroids are computed from the full-precision rings before thinning.
 
 ### Refreshing the crime data
 
@@ -87,8 +107,18 @@ actually use. Reconciliation is done by two exhaustive lookup tables:
 
 | File | Rows | Mapped |
 | --- | --- | --- |
-| `data/rent_area_mapping_v2.csv` | 556 | 207 |
-| `data/crime_area_mapping_v2.csv` | 416 | 220 |
+| `data/rent_area_mapping_linz.csv` | 548 | 348 |
+| `data/crime_area_mapping_linz.csv` | 405 | 248 |
+
+`scraper/build_linz_mappings.py` resolves each source area by four explicit rules, recording
+which one fired in a `via` column so nothing resolves silently:
+
+| via | Rule | Rent | Crime |
+| --- | --- | --- | --- |
+| `exact` | Name matches a LINZ suburb once macrons and Mt/Saint are folded | 55 | 63 |
+| `previous-mapping` | Carried through the earlier 62-suburb table | 179 | 159 |
+| `strip-direction` | `Mount Eden West` → `Mount Eden` | 106 | 13 |
+| `manual` | Decided by hand, listed in the script | 8 | 13 |
 
 Schema:
 
@@ -107,8 +137,9 @@ empty and nobody notices until they eyeball the map. Four separate outages trace
 before the tables became exhaustive (`Mt`/`Mount`, `Beachhaven`/`Beach Haven`,
 `St`/`Saint Heliers`, and Flat Bush being called `Ormiston` in the source).
 
-Of the 220 mapped crime areas, 219 match a row in the crime CSV; the mapping file lists
-11 areas that do not appear in the data at all.
+Unmapped rows are outer or rural areas that no LINZ urban suburb covers. Coverage reaches
+149 of 172 suburbs for rent and 114 for crime; the remainder render as "no data" rather than
+being dropped.
 
 ---
 
@@ -140,10 +171,11 @@ python3 scraper/inline_data.py             # JSON -> frontend/*.html
 
 ```jsonc
 {
-  "suburb": "Mt Eden",
-  "lat": -36.883, "lng": 174.753,
-  "zone": "inner",              // "inner" (36) | "suburban" (26)
-  "crime_2025": 510,            // null when unmapped
+  "suburb": "Mount Eden",
+  "lat": -36.87671, "lng": 174.7615,   // centroid of the LINZ boundary
+  "region": "Central",                 // compass grouping
+  "population": 26947,                 // Stats NZ estimate via LINZ
+  "crime_2025": 510,                   // absolute; the UI divides by population
   "rent": {                     // weekly median, NZD — five dwelling types
     "House":     { "1": 646, "2": 666, "3": 811, "4": 1081, "All": 847 },
     "Apartment": { "1": 489, "2": 628, "3": 1260, "All": 660 },
