@@ -1,7 +1,7 @@
 """Inline the built JSON into the standalone HTML pages.
 
 The frontend has no build step — data lives directly in the file as
-`const SUBURB_DATA = [...]` and `const RAW_AREAS = {...}`. This swaps those
+`const SUBURB_DATA = [...]` and `const SUBURB_GEO = {...}`. This swaps those
 assignments for the current contents of data/.
 
 Usage:  python scraper/inline_data.py
@@ -14,13 +14,15 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(REPO, "data")
 
 TARGETS = {
-    "frontend/prototype_v1.html": ["SUBURB_DATA", "RAW_AREAS", "SUBURB_GEO"],
+    "frontend/prototype_v1.html": ["SUBURB_DATA", "SUBURB_GEO"],
     "frontend/auckland_map.html": ["SUBURB_DATA"],
 }
 
+# raw_areas.json is still built — it records how each source area folds onto a
+# suburb, which is worth keeping auditable — but the page no longer shows the
+# source boundaries, so it is not inlined.
 SOURCES = {
     "SUBURB_DATA": os.path.join(DATA, "suburbs.json"),
-    "RAW_AREAS": os.path.join(DATA, "raw_areas.json"),
     "SUBURB_GEO": os.path.join(DATA, "linz_suburbs.geojson"),
 }
 

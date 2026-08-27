@@ -16,7 +16,7 @@ can weigh cost against safety when choosing where to live.
 | `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
 | `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |
 | `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
-| `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json` + `raw_areas.json` |
+| `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json` (and `raw_areas.json`, kept for auditing the fold) |
 | `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML pages |
 | `scraper/test_mbie_api.py` | Probe for what the API currently serves |
 
