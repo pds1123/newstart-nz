@@ -287,10 +287,7 @@ input[type=range]::-webkit-slider-thumb {
 
 /* ── LEAFLET OVERRIDES ── */
 .leaflet-container { background: var(--bg); font-family: inherit; }
-/* OSM's tiles are full-colour and label-heavy — good as a map, wrong as the
-   backdrop for one. Washing them out lets the choropleth carry the meaning.
-   CARTO's light basemap used to do this for us before it required a key. */
-.leaflet-tile-pane { filter: grayscale(1) brightness(1.25) contrast(0.55) opacity(0.35); }
+/* Esri's canvas is already a neutral grey, so nothing needs filtering. */
 .leaflet-control-zoom a { background: var(--surface) !important; border-color: var(--border) !important; color: var(--muted) !important; font-weight: 600; }
 .leaflet-control-zoom a:hover { background: var(--bg) !important; color: var(--text) !important; }
 .leaflet-control-attribution { background: rgba(255,255,255,0.8) !important; color: var(--faint) !important; font-size: 9px !important; }
@@ -790,10 +787,14 @@ function jumpTo(mode) {
 // Zoom sits bottom-right so it clears the KPI bar overlaying the top of the map.
 const map = L.map('map', { center: [-36.87,174.78], zoom: 11, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap · Boundaries: LINZ CC BY 4.0 · '
+// Esri's Light Gray Canvas: built as a backdrop for data, so it carries no
+// labels or icons of its own. OSM's tiles kept competing with our own labels,
+// and a CSS filter can mute colour but cannot remove text.
+L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/'
+          + 'World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri, HERE, Garmin, &copy; OpenStreetMap · Boundaries: LINZ CC BY 4.0 · '
              + 'Rent: MBIE to Jun 2026 · Crime: NZ Police 2025',
-  maxZoom: 19
+  maxZoom: 16
 }).addTo(map);
 map.attributionControl.setPrefix('');
 
@@ -805,10 +806,29 @@ map.on('zoomend', syncLabelVisibility);
 
 const GEO_BY_NAME = {};
 let shapes = {};
+let outline = null;   // boundary traced under the pointer at suburb granularity
+
+// Circles say where a suburb is; its actual shape is worth seeing when you
+// single one out, so LINZ's boundary is traced on hover and selection.
+function traceOutline(name) {
+  clearOutline();
+  const rings = GEO_BY_NAME[name];
+  if (!rings || granularity === 'region') return;
+  outline = L.polygon(rings, {
+    color: '#0F1C18', weight: 1.6, opacity: 0.85,
+    fill: true, fillColor: '#0F1C18', fillOpacity: 0.06,
+    interactive: false,
+  }).addTo(map);
+}
+
+function clearOutline() {
+  if (outline) { map.removeLayer(outline); outline = null; }
+}
 
 function buildMarkers() {
   Object.values(markers).forEach(m => { map.removeLayer(m.circle); map.removeLayer(m.label); });
   Object.values(shapes).forEach(s => map.removeLayer(s));
+  clearOutline();
   markers = {}; shapes = {};
 
   const drawn = new Set();
@@ -876,12 +896,14 @@ function buildMarkers() {
     if (!polys.length) {
       circle.on('mouseover', function (e) {
         this.setStyle({ fillOpacity: over ? 0.5 : 1, weight: 2.5 });
+        traceOutline(d.suburb);
         highlightDot(d.suburb, true);
         showTip(d, e.originalEvent.clientX, e.originalEvent.clientY);
       });
       circle.on('mouseout', function () {
         this.setStyle({ fillOpacity: over ? 0.3 : 0.85,
                         weight: selected === d.suburb ? 2.5 : 1.5 });
+        if (selected) traceOutline(selected); else clearOutline();
         highlightDot(d.suburb, false);
         hideTip();
       });
@@ -902,6 +924,7 @@ function buildMarkers() {
   });
 
   syncLabelVisibility();
+  if (selected && granularity !== 'region') traceOutline(selected);
 }
 
 // ── SCATTER ──
