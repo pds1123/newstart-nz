@@ -287,6 +287,9 @@ input[type=range]::-webkit-slider-thumb {
 
 /* ── LEAFLET OVERRIDES ── */
 .leaflet-container { background: var(--bg); font-family: inherit; }
+/* OSM's own tiles are full-colour and label-heavy. Muting them to a light grey
+   wash lets the data layer read; CARTO's light basemap used to do this for us. */
+.leaflet-tile-pane { filter: grayscale(1) brightness(1.08) contrast(0.88) opacity(0.55); }
 .leaflet-control-zoom a { background: var(--surface) !important; border-color: var(--border) !important; color: var(--muted) !important; font-weight: 600; }
 .leaflet-control-zoom a:hover { background: var(--bg) !important; color: var(--text) !important; }
 .leaflet-control-attribution { background: rgba(255,255,255,0.8) !important; color: var(--faint) !important; font-size: 9px !important; }
@@ -299,6 +302,11 @@ input[type=range]::-webkit-slider-thumb {
 .sc-median { stroke: #C4C0B6; stroke-width: 1.2; stroke-dasharray: 4 4; }
 .sc-qlabel { font-size: 9px; font-weight: 700; letter-spacing: 0.4px; opacity: 0.55; }
 .sc-dot { cursor: pointer; transition: stroke-width 0.1s; }
+
+/* 172 suburb names at once is unreadable when the whole city is in view, so
+   they appear only once the map is zoomed past the point of overlap. */
+.map-label.suburb { transition: opacity 0.15s; }
+.leaflet-container.labels-off .map-label.suburb { opacity: 0; }
 
 /* ── BAR CHART ── */
 .panel-body.scrolling { overflow-y: auto; }
@@ -790,6 +798,12 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 map.attributionControl.setPrefix('');
 
+const LABEL_ZOOM = 13;
+function syncLabelVisibility() {
+  map.getContainer().classList.toggle('labels-off', map.getZoom() < LABEL_ZOOM);
+}
+map.on('zoomend', syncLabelVisibility);
+
 const GEO_BY_NAME = {};
 let shapes = {};
 
@@ -814,21 +828,25 @@ function buildMarkers() {
 
     if (polys.length) {
       polys.forEach(rings => {
+        // At region granularity the members share an outline colour with their
+        // fill, so the internal divisions disappear and the region reads as one
+        // shape. Suburb granularity keeps a thin white edge between neighbours.
+        const edge = granularity === 'region' ? color : '#fff';
         const layer = L.polygon(rings, {
-          color: isSel ? '#0F1C18' : '#fff',
-          weight: isSel ? 2 : (granularity === 'region' ? 0.6 : 0.9),
-          opacity: 0.9,
+          color: isSel ? '#0F1C18' : edge,
+          weight: isSel ? 2 : (granularity === 'region' ? 1 : 0.7),
+          opacity: granularity === 'region' ? 1 : 0.85,
           fillColor: color,
-          fillOpacity: over ? 0.25 : 0.7,
+          fillOpacity: over ? 0.3 : 0.75,
         }).addTo(map);
         layer.on('mouseover', e => {
-          layer.setStyle({ fillOpacity: over ? 0.45 : 0.9, weight: 2 });
+          layer.setStyle({ fillOpacity: over ? 0.5 : 0.92, weight: 2 });
           highlightDot(d.suburb, true);
           showTip(d, e.originalEvent.clientX, e.originalEvent.clientY);
         });
         layer.on('mouseout', () => {
-          layer.setStyle({ fillOpacity: over ? 0.25 : 0.7,
-                           weight: selected === d.suburb ? 2 : (granularity === 'region' ? 0.6 : 0.9) });
+          layer.setStyle({ fillOpacity: over ? 0.3 : 0.75,
+                           weight: selected === d.suburb ? 2 : (granularity === 'region' ? 1 : 0.7) });
           highlightDot(d.suburb, false);
           hideTip();
         });
@@ -864,14 +882,20 @@ function buildMarkers() {
       circle.on('click', () => selectSuburb(d.suburb, false));
     }
 
+    const big = granularity === 'region';
     const icon = L.divIcon({
-      className: '',
-      html: `<div style="font-size:8.5px;font-weight:600;color:#0F1C18;text-shadow:0 0 3px #fff,0 0 5px #fff;white-space:nowrap;text-align:center;pointer-events:none;opacity:${over?0.35:1}">${d.suburb}</div>`,
-      iconAnchor: [0, granularity === 'region' ? 0 : -12]
+      className: big ? 'map-label region' : 'map-label suburb',
+      html: `<div style="font-size:${big?13:8.5}px;font-weight:${big?800:600};`
+          + `color:#0F1C18;text-shadow:0 0 4px #fff,0 0 8px #fff,0 0 12px #fff;`
+          + `letter-spacing:${big?'0.5px':'0'};white-space:nowrap;text-align:center;`
+          + `pointer-events:none;opacity:${over?0.35:1}">${d.suburb}</div>`,
+      iconAnchor: [0, big ? 0 : -12]
     });
     const label = L.marker([d.lat,d.lng], { icon, interactive: false }).addTo(map);
     markers[d.suburb] = { circle, label, data: d };
   });
+
+  syncLabelVisibility();
 }
 
 // ── SCATTER ──
@@ -1171,8 +1195,8 @@ function highlightMarker(name, on) {
     Object.entries(shapes).forEach(([k, layer]) => {
       if (!k.startsWith(name + '|')) return;
       layer.setStyle({
-        weight: on ? 2 : (selected === name ? 2 : (granularity === 'region' ? 0.6 : 0.9)),
-        fillOpacity: on ? (over ? 0.45 : 0.9) : (over ? 0.25 : 0.7),
+        weight: on ? 2 : (selected === name ? 2 : (granularity === 'region' ? 1 : 0.7)),
+        fillOpacity: on ? (over ? 0.5 : 0.92) : (over ? 0.3 : 0.75),
       });
     });
     return;
