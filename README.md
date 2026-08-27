@@ -26,36 +26,9 @@ All frontend files are standalone HTML — open one in a browser, no build step.
 pulled by `scraper/fetch_rent.py`. Statistical area unit and ward level, 12 months ending
 June 2026 (covers 2025-07-01 to 2026-06-30). Values shown are medians.
 
-**Crime** — NZ Police *Victimisations Time and Place*, downloaded by hand from the Tableau
-report and saved to `data/`:
-
-- Report: <https://public.tableau.com/views/VictimisationsTimeandPlace/Summary>
-- Landing page: [policedata.nz](https://www.police.govt.nz/about-us/publications-statistics/data-and-statistics/policedatanz)
-
-Set **Region** to `Auckland Region`, **Territorial Authority** to `Auckland`, and
-**Boundary to display** to `Area Unit` — the mapping table is built against area units, so
-any other boundary will not join.
-
-Then take the **Data** download, not Crosstab. Crosstab exports the table as displayed,
-which on this dashboard is an hour-by-weekday grid with no geography in it at all. Select
-the **Table ST** worksheet, open the data window, switch to its **Full Data** tab and
-download from there. A correct export is named `Table ST_..._data.csv` and has three
-columns: `Area Unit`, `Year Month`, `Number of Victimisations`.
-
-That file needs three fixes before it will join:
-
-- It is **UTF-16 encoded and tab-separated**, not UTF-8 CSV
-- Area unit names carry a **trailing full stop** (`Inlet-Waitemata Harbour.`)
-- Summing by area unit yields 416 areas; **11 are water or islands** and are dropped
-  (Auckland City-Marinas, Auckland Harbourside, Bays-Waiheke Island, the four Inlet-*
-  and Tidal-* entries, Oceanic-Auckland Region East, Tamaki Strait, Waiheke Island)
-
-Aggregate to `suburb,total_crimes_2025`. Note the report excludes victim demographics,
-homicides, and non-burglary victimisations occurring in dwellings, so counts sit below the
-true totals by design.
-
-The current file covers calendar 2025, which does **not** line up with the rent window —
-worth aligning on the next refresh.
+**Crime** — NZ Police [*Victimisations Time and Place*](https://public.tableau.com/views/VictimisationsTimeandPlace/Summary),
+exported by hand at area-unit level for calendar 2025. The export has a few traps in it —
+see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#refreshing-the-crime-data) before repeating it.
 
 The two datasets use different geographic boundaries, so `rent_area_mapping_v2.csv` and
 `crime_area_mapping_v2.csv` fold 556 rent source areas and 416 police source areas onto a

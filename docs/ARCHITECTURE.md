@@ -55,6 +55,29 @@ and answer the wrong question for someone asking what they can actually rent.
 two columns (`suburb`, `total_crimes_2025`). Absolute counts, not rates. See
 [Limitations](#limitations).
 
+### Refreshing the crime data
+
+The crime file is exported by hand from the Tableau report; there is no API. Set **Region**
+to `Auckland Region`, **Territorial Authority** to `Auckland`, and **Boundary to display**
+to `Area Unit` — the mapping table is built against area units, so no other boundary joins.
+
+Take the **Data** download, not Crosstab. Crosstab exports the table as displayed, which on
+this dashboard is an hour-by-weekday grid containing no geography at all. Select the
+**Table ST** worksheet, open its data window, switch to the **Full Data** tab and download
+from there. A correct export is named `Table ST_..._data.csv` with three columns:
+`Area Unit`, `Year Month`, `Number of Victimisations`.
+
+Three things about that file will silently break a join:
+
+| Trap | Fix |
+| --- | --- |
+| UTF-16, tab-separated | Decode as `utf-16`, split on `\t` — not UTF-8 CSV |
+| Area names carry a trailing full stop (`Inlet-Waitemata Harbour.`) | `rstrip('.')` before matching |
+| Summing yields 416 areas, 11 of them water or islands | Drop the `Inlet-*`, `Tidal-*`, `Oceanic-*`, marina and Waiheke entries |
+
+Aggregate to `suburb,total_crimes_2025`. Reconstructing this from the committed file
+reproduced all 405 rows exactly, so the procedure is known-good rather than inferred.
+
 ---
 
 ## The mapping layer
