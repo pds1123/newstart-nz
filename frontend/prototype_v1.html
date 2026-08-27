@@ -804,6 +804,14 @@ function syncLabelVisibility() {
 }
 map.on('zoomend', syncLabelVisibility);
 
+// Population spans about 11 to 55,000, so the square root keeps the largest
+// suburbs from swamping everything else — dot area, not radius, tracks size.
+let POP_MAX = 1;
+function markerRadius(d) {
+  const p = d.population || 0;
+  return 4 + Math.sqrt(p / POP_MAX) * 9;
+}
+
 const GEO_BY_NAME = {};
 let shapes = {};
 let outline = null;   // boundary traced under the pointer at suburb granularity
@@ -882,15 +890,19 @@ function buildMarkers() {
       drawn.add(d.suburb);
     }
 
-    // Circle marker: the interaction target for cross-highlighting, and the
-    // only visible mark for the handful of suburbs LINZ has no polygon for.
+    // Circle marker: the interaction target, and the visible mark wherever a
+    // shape is not drawn. Radius follows population so the map has a hierarchy
+    // — 172 identical dots read as a rash rather than a distribution. Suburbs
+    // with nothing to show shrink and fade instead of competing for attention.
+    const blank = getRent(d) == null && getCrimeRate(d) == null;
+    const r = blank ? 3.5 : markerRadius(d);
     const circle = L.circleMarker([d.lat, d.lng], {
-      radius: polys.length ? 0 : (isSel ? 11 : 8),
+      radius: polys.length ? 0 : (isSel ? r + 3 : r),
       fillColor: color,
-      fillOpacity: polys.length ? 0 : (over ? 0.3 : 0.85),
+      fillOpacity: polys.length ? 0 : (blank ? 0.3 : (over ? 0.3 : 0.85)),
       color: isSel ? '#0F1C18' : '#fff',
-      weight: polys.length ? 0 : (isSel ? 2.5 : 1.5),
-      opacity: polys.length ? 0 : (over ? 0.4 : 0.95),
+      weight: polys.length ? 0 : (blank ? 0.6 : (isSel ? 2.5 : 1.4)),
+      opacity: polys.length ? 0 : (blank ? 0.4 : (over ? 0.4 : 0.95)),
     }).addTo(map);
 
     if (!polys.length) {
@@ -911,6 +923,9 @@ function buildMarkers() {
     }
 
     const big = granularity === 'region';
+    if (blank && !big) { markers[d.suburb] = { circle, label: L.marker([d.lat,d.lng],
+        { icon: L.divIcon({ className: '', html: '' }), interactive: false }).addTo(map),
+        data: d }; return; }
     const icon = L.divIcon({
       className: big ? 'map-label region' : 'map-label suburb',
       html: `<div style="font-size:${big?13:8.5}px;font-weight:${big?800:600};`
@@ -1506,6 +1521,7 @@ SUBURB_GEO.features.forEach(f => {
   GEO_BY_NAME[f.properties.name] =
     f.geometry.coordinates.map(poly => poly.map(ring => ring.map(([x, y]) => [y, x])));
 });
+POP_MAX = Math.max(...SUBURB_DATA.map(d => d.population || 0), 1);
 REGION_DATA = buildRegions();
 syncGranStops();
 setGranularity('region');
