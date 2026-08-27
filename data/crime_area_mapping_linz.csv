@@ -1,10 +1,10 @@
 source_area,linz_suburb,status,via,reason_if_not_mapped
-Abbotts Park,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Abbotts Park,Remuera,mapped,manual,
 Akarana,Northcote,mapped,previous-mapping,
 Albany,Albany,mapped,exact,
 Algies Bay,,not mapped,,outer Auckland — outside coverage area
-Ambury,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Aorere,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Ambury,Māngere Bridge,mapped,manual,
+Aorere,Māngere,mapped,manual,
 Arahanga,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Arch Hill,Grey Lynn,mapped,previous-mapping,
 Ardmore,,not mapped,,outer Auckland — outside coverage area
@@ -17,7 +17,7 @@ Avondale West,Avondale,mapped,stem,
 Awaruku,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Awhitu,,not mapped,,outer Auckland — outside coverage area
 Balmoral,Mount Eden,mapped,manual,
-Baverstock Oaks,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Baverstock Oaks,Flat Bush,mapped,manual,
 Bayswater,Bayswater,mapped,exact,
 Beachhaven North,Beach Haven,mapped,stem,
 Beachhaven South,Beach Haven,mapped,stem,
@@ -49,7 +49,7 @@ Clendon South,,not mapped,,outer Auckland — outside coverage area
 Clevedon,,not mapped,,outer Auckland — outside coverage area
 Clover Park,Clover Park,mapped,exact,
 Cockle Bay,Cockle Bay,mapped,exact,
-Crown Hill,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Crown Hill,Forrest Hill,mapped,manual,
 Crum Park,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Dairy Flat-Redvale,Albany,mapped,previous-mapping,
 Dannemora,Dannemora,mapped,exact,
@@ -73,8 +73,8 @@ Fairview,Glenfield,mapped,previous-mapping,
 Favona North,Favona,mapped,stem,
 Favona South,Favona,mapped,stem,
 Favona West,Favona,mapped,stem,
-Ferguson,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Ferndale,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Ferguson,Ōtara,mapped,manual,
+Ferndale,Mount Wellington,mapped,manual,
 Forrest Hill,Forrest Hill,mapped,exact,
 Freemans Bay,Freemans Bay,mapped,exact,
 Fruitvale,New Lynn,mapped,previous-mapping,
@@ -83,7 +83,7 @@ Glen Eden East,Glen Eden,mapped,stem,
 Glen Innes East,Glen Innes,mapped,stem,
 Glen Innes North,Glen Innes,mapped,stem,
 Glen Innes West,Glen Innes,mapped,stem,
-Glenavon,New Lynn,mapped,previous-mapping,
+Glenavon,New Lynn,mapped,manual,
 Glenbrook,,not mapped,,outer Auckland — outside coverage area
 Glendene North,Glendene,mapped,stem,
 Glendene South,Glendene,mapped,stem,
@@ -105,7 +105,7 @@ Gulf Harbour,,not mapped,,outer Auckland — outside coverage area
 Half Moon Bay,Half Moon Bay,mapped,exact,
 Hamlin,Panmure,mapped,previous-mapping,
 Harania East,Māngere,mapped,previous-mapping,
-Harania North,Māngere,mapped,previous-mapping,
+Harania North,Māngere East,mapped,manual,
 Harania West,Māngere,mapped,previous-mapping,
 Hatfields Beach,,not mapped,,outer Auckland — outside coverage area
 Hauraki,Hauraki,mapped,exact,
@@ -140,7 +140,7 @@ Karekare,,not mapped,,outer Auckland — outside coverage area
 Kaukapakapa,,not mapped,,outer Auckland — outside coverage area
 Kaukapakapa Rural,,not mapped,,outer Auckland — outside coverage area
 Kauri Park,Albany,mapped,previous-mapping,
-Kaurilands,Titirangi,mapped,previous-mapping,
+Kaurilands,Titirangi,mapped,manual,
 Kawakawa-Orere,,not mapped,,outer Auckland — outside coverage area
 Kawau,,not mapped,,outer Auckland — outside coverage area
 Kelston Central,Kelston,mapped,stem,
@@ -151,18 +151,18 @@ Kingsland,Kingsland,mapped,exact,
 Kohimarama East,Kohimarama,mapped,stem,
 Kohimarama West,Kohimarama,mapped,stem,
 Kohuora,Papatoetoe,mapped,previous-mapping,
-Konini,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Konini,Glen Eden,mapped,manual,
 Kumeu East,,not mapped,,outer Auckland — outside coverage area
 Kumeu West,,not mapped,,outer Auckland — outside coverage area
 Laingholm,Laingholm,mapped,exact,
 Lake Pupuke,Milford,mapped,previous-mapping,
-Leabank,Ōtara,mapped,previous-mapping,
+Leabank,Manurewa,mapped,manual,
 Leigh,,not mapped,,outer Auckland — outside coverage area
 Long Bay,Long Bay,mapped,exact,
 Lucken Point,West Harbour,mapped,previous-mapping,
 Lynfield North,Lynfield,mapped,stem,
 Lynfield South,Lynfield,mapped,stem,
-Lynnmall,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Lynnmall,New Lynn,mapped,manual,
 Mairangi Bay,Mairangi Bay,mapped,exact,
 Mangere Bridge,Māngere Bridge,mapped,exact,
 Mangere Central,Māngere,mapped,stem,
@@ -178,8 +178,8 @@ Massey Park,Massey,mapped,previous-mapping,
 Massey West,Massey,mapped,stem,
 Matakana,,not mapped,,outer Auckland — outside coverage area
 Matipo,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Maungawhau,Mount Eden,mapped,previous-mapping,
-McLaren Park,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Maungawhau,Mount Eden,mapped,manual,
+McLaren Park,Henderson,mapped,manual,
 Mcleod,Glenfield,mapped,previous-mapping,
 Meadowbank North,Meadowbank,mapped,stem,
 Meadowbank South,Meadowbank,mapped,stem,
@@ -230,7 +230,7 @@ Opaheke,,not mapped,,outer Auckland — outside coverage area
 Opanuku,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Orakei North,Ōrākei,mapped,stem,
 Orakei South,Ōrākei,mapped,stem,
-Oranga,Onehunga,mapped,previous-mapping,
+Oranga,Onehunga,mapped,manual,
 Oratia,Oratia,mapped,exact,
 Oratia West,Oratia,mapped,stem,
 Orewa,,not mapped,,outer Auckland — outside coverage area
@@ -244,14 +244,14 @@ Otara North,Ōtara,mapped,stem,
 Otara South,Ōtara,mapped,stem,
 Otara West,Ōtara,mapped,stem,
 Otimai,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Owairaka East,Mount Albert,mapped,previous-mapping,
-Owairaka West,Mount Albert,mapped,previous-mapping,
+Owairaka East,Mount Albert,mapped,manual,
+Owairaka West,Mount Albert,mapped,manual,
 Paerata-Cape Hill,,not mapped,,outer Auckland — outside coverage area
 Pahurehure,,not mapped,,outer Auckland — outside coverage area
 Pakuranga Central,Pakuranga,mapped,stem,
 Pakuranga East,Pakuranga,mapped,stem,
 Pakuranga North,Pakuranga,mapped,stem,
-Palm Heights,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Palm Heights,Henderson,mapped,manual,
 Panmure Basin,Panmure,mapped,previous-mapping,
 Papakura Central,,not mapped,,outer Auckland — outside coverage area
 Papakura East,,not mapped,,outer Auckland — outside coverage area
@@ -269,8 +269,8 @@ Paremoremo East,Pāremoremo,mapped,stem,
 Paremoremo West,Pāremoremo,mapped,stem,
 Parnell East,Parnell,mapped,stem,
 Parnell West,Parnell,mapped,stem,
-Parrs Park,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Parrs Park West,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Parrs Park,Glen Eden,mapped,manual,
+Parrs Park West,Glen Eden,mapped,manual,
 Patumahoe,,not mapped,,outer Auckland — outside coverage area
 Penrose,Penrose,mapped,exact,
 Pigeon Mountain North,Howick,mapped,previous-mapping,
@@ -288,7 +288,7 @@ Puhinui South,Wiri,mapped,manual,
 Pukekohe North,,not mapped,,outer Auckland — outside coverage area
 Pukekohe West,,not mapped,,outer Auckland — outside coverage area
 Randwick Park,Randwick Park,mapped,exact,
-Ranui Domain,Massey,mapped,previous-mapping,
+Ranui Domain,Rānui,mapped,manual,
 Ranui South,Rānui,mapped,stem,
 Red Beach East,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Red Beach West,,not mapped,,outside 62 suburb coverage — small area or low rental activity
@@ -307,7 +307,7 @@ Rongomai,Ōtara,mapped,previous-mapping,
 Rosebank,Avondale,mapped,previous-mapping,
 Rosehill,,not mapped,,outer Auckland — outside coverage area
 Rothesay Bay,Rothesay Bay,mapped,exact,
-Rowandale,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Rowandale,Manurewa,mapped,manual,
 Royal Heights,Massey,mapped,previous-mapping,
 Royal Oak,Royal Oak,mapped,exact,
 Royal Road West,Massey,mapped,previous-mapping,
@@ -349,13 +349,13 @@ Takanini North,Takanini,mapped,stem,
 Takanini South,Takanini,mapped,stem,
 Takanini West,Takanini,mapped,stem,
 Takapuna Central,Takapuna,mapped,stem,
-Tamaki,Glen Innes,mapped,previous-mapping,
+Tamaki,Panmure,mapped,manual,
 Tangutu,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Target Road,Glenfield,mapped,previous-mapping,
 Tauhoa-Puhoi,,not mapped,,outer Auckland — outside coverage area
 Taupaki,,not mapped,,outer Auckland — outside coverage area
 Te Atatu Central,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Te Papapa,Onehunga,mapped,previous-mapping,
+Te Papapa,Onehunga,mapped,manual,
 Three Kings,Three Kings,mapped,exact,
 Tidal-Eastern Bays,,not mapped,,water body / inlet / island
 Titirangi South,Titirangi,mapped,stem,
@@ -369,17 +369,17 @@ Vipond,,not mapped,,outer Auckland — outside coverage area
 Viscount,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Wade Heads,,not mapped,,outer Auckland — outside coverage area
 Waiake,Waiake,mapped,exact,
-Waiata,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Waiata,Remuera,mapped,manual,
 Waikowhai East,Mount Roskill,mapped,previous-mapping,
 Waikowhai West,Mount Roskill,mapped,previous-mapping,
-Waima,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Waima,Titirangi,mapped,manual,
 Waimauku,,not mapped,,outer Auckland — outside coverage area
 Waimumu North,,not mapped,,outer Auckland — outside coverage area
 Waimumu South,,not mapped,,outer Auckland — outside coverage area
 Waipareira West,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Waitakere,Waitākere,mapped,exact,
 Waitakere West,Waitākere,mapped,stem,
-Waitaramoa,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Waitaramoa,Remuera,mapped,manual,
 Waiuku East,,not mapped,,outer Auckland — outside coverage area
 Waiuku West,,not mapped,,outer Auckland — outside coverage area
 Wakeling,,not mapped,,outside 62 suburb coverage — small area or low rental activity
@@ -392,15 +392,15 @@ Wellsford,,not mapped,,outer Auckland — outside coverage area
 Wesley,Wesley,mapped,exact,
 West Harbour,West Harbour,mapped,exact,
 Westgate,Westgate,mapped,exact,
-Westlake,Albany,mapped,previous-mapping,
+Westlake,Forrest Hill,mapped,manual,
 Westmere,Westmere,mapped,exact,
 Weymouth East,Weymouth,mapped,stem,
 Weymouth West,Weymouth,mapped,stem,
 Whangapouri Creek,,not mapped,,outside 62 suburb coverage — small area or low rental activity
 Whenuapai West,Whenuapai,mapped,stem,
 Windsor Park,Windsor Park,mapped,exact,
-Windy Ridge,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Windy Ridge,Glenfield,mapped,manual,
 Wiri,Wiri,mapped,exact,
 Witheford,,not mapped,,outside 62 suburb coverage — small area or low rental activity
-Woodglen,,not mapped,,outside 62 suburb coverage — small area or low rental activity
+Woodglen,Glen Eden,mapped,manual,
 Wymondley,,not mapped,,outside 62 suburb coverage — small area or low rental activity

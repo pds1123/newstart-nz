@@ -20,6 +20,9 @@ DATA = os.path.join(REPO, "data")
 # to a LINZ suburb. Balmoral and St Lukes are not LINZ suburbs at all — LINZ
 # folds them into neighbours — so their rent and crime go to those neighbours.
 MANUAL = {
+    # --- Decided by hand -------------------------------------------------
+    # Balmoral and St Lukes are not LINZ suburbs; LINZ folds them into
+    # neighbours, so their rent and crime follow.
     "Balmoral": "Mount Eden",
     "St Lukes": "Mount Albert",
     "St Lukes North": "Mount Albert",
@@ -29,7 +32,6 @@ MANUAL = {
     "Botany Junction": "Botany Downs",
     "Manukau Central": "Manukau City Centre",
     "Golfland": "Botany Downs",
-    "Golflands": "Golflands",
     "Meadowland": "Botany Downs",
     "Millhouse": "Botany Downs",
     "Greenmount": "East Tāmaki",
@@ -38,7 +40,86 @@ MANUAL = {
     "Ormiston": "Flat Bush",
     "Puhinui North": "Wiri",
     "Puhinui South": "Wiri",
+    "Puhinui East": "Wiri",
+
+    # --- CBD statistical areas -------------------------------------------
+    # All of these sit inside the city centre, which LINZ calls Auckland
+    # Central. Together they carry about 7,000 bonds that were being dropped.
+    "Anzac Avenue": "Auckland Central",
+    "Queen Street": "Auckland Central",
+    "Queen Street South West": "Auckland Central",
+    "Karangahape": "Auckland Central",
+    "Auckland-University": "Auckland Central",
+    "Symonds Street West": "Auckland Central",
+    "Symonds Street North West": "Auckland Central",
+    "Symonds Street East": "Auckland Central",
+    "The Strand": "Parnell",
+
+    # --- Confirmed by LINZ's own additional_name field --------------------
+    "Tamaki": "Panmure",
+    "Owairaka West": "Mount Albert",
+    "Owairaka East": "Mount Albert",
+    "Royal Heights North": "Massey",
+    "Royal Heights South": "Massey",
+    "Westlake": "Forrest Hill",
+    "McLaren Park": "Henderson",
+    "Te Papapa": "Onehunga",
+    "Oranga": "Onehunga",
+    "Chapel Downs": "Clover Park",
+    "Waikowhai South": "Mount Roskill",
+    "Waikowhai North": "Mount Roskill",
+    "Konini": "Glen Eden",
+    "Kaurilands": "Titirangi",
+    "Cheltenham": "Devonport",
+    "Akoranga": "Northcote",
+    "Waima": "Titirangi",
+    "Waima-Woodlands Park": "Titirangi",
+    "Palm Heights": "Henderson",
+    "Windy Ridge": "Glenfield",
+    "Crown Hill": "Forrest Hill",
+
+    # --- Recovered by reading the rent area names -------------------------
+    # `Mount Wellington Ferndale` names the suburb a police locality sits in.
+    "Ferndale": "Mount Wellington",
+    "Mount Wellington Ferndale": "Mount Wellington",
+    "Woodglen": "Glen Eden",
+    "Glen Eden Woodglen": "Glen Eden",
+    "Glen Eden Rosier": "Glen Eden",
+    "Abbotts Park": "Remuera",
+    "Waitaramoa": "Remuera",
+    "Waiata": "Remuera",
+    "Ambury": "Māngere Bridge",
+
+    # --- Named after a landmark in the suburb -----------------------------
+    "Lynnmall": "New Lynn",
+    "Maungawhau": "Mount Eden",          # the maunga Mount Eden is named for
+    "Eden Valley": "Mount Eden",
+    "Mount St John": "Epsom",
+    "Mount Roskill White Swan": "Mount Roskill",
+    "West Lynn": "Grey Lynn",
+    "Ranui Domain": "Rānui",
+    "Rowandale": "Manurewa",
+    "Rowandale East": "Manurewa",
+    "Rowandale West": "Manurewa",
+    "Leabank": "Manurewa",
+    "Aorere": "Māngere",
+    "Aorere Central": "Māngere",
+    "Aorere North": "Māngere",
+    "Aorere South": "Māngere",
+    "Harania North": "Māngere East",
+    "Harania South": "Māngere East",
+    "Ferguson": "Ōtara",
+    "Rongomai East": "Ōtara",
+    "Rongomai West": "Ōtara",
+    "Baverstock": "Flat Bush",
+    "Baverstock Oaks": "Flat Bush",
+    "Parrs Park": "Glen Eden",
+    "Parrs Park West": "Glen Eden",
+    "Panmure Glen Innes Industrial": "Panmure",
+    "Glenavon": "New Lynn",
+    "Eden Park": "Kingsland",
 }
+
 
 DIRS = r"(north|south|east|west|central|upper|lower|nth|sth)"
 
