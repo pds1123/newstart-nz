@@ -287,9 +287,10 @@ input[type=range]::-webkit-slider-thumb {
 
 /* ── LEAFLET OVERRIDES ── */
 .leaflet-container { background: var(--bg); font-family: inherit; }
-/* OSM's own tiles are full-colour and label-heavy. Muting them to a light grey
-   wash lets the data layer read; CARTO's light basemap used to do this for us. */
-.leaflet-tile-pane { filter: grayscale(1) brightness(1.08) contrast(0.88) opacity(0.55); }
+/* OSM's tiles are full-colour and label-heavy — good as a map, wrong as the
+   backdrop for one. Washing them out lets the choropleth carry the meaning.
+   CARTO's light basemap used to do this for us before it required a key. */
+.leaflet-tile-pane { filter: grayscale(1) brightness(1.25) contrast(0.55) opacity(0.35); }
 .leaflet-control-zoom a { background: var(--surface) !important; border-color: var(--border) !important; color: var(--muted) !important; font-weight: 600; }
 .leaflet-control-zoom a:hover { background: var(--bg) !important; color: var(--text) !important; }
 .leaflet-control-attribution { background: rgba(255,255,255,0.8) !important; color: var(--faint) !important; font-size: 9px !important; }
@@ -789,8 +790,6 @@ function jumpTo(mode) {
 // Zoom sits bottom-right so it clears the KPI bar overlaying the top of the map.
 const map = L.map('map', { center: [-36.87,174.78], zoom: 11, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
-// OpenStreetMap's own tiles need no key; CARTO's light basemap started
-// watermarking "API KEY REQUIRED" over the map.
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap · Boundaries: LINZ CC BY 4.0 · '
              + 'Rent: MBIE to Jun 2026 · Crime: NZ Police 2025',
@@ -831,22 +830,28 @@ function buildMarkers() {
         // At region granularity the members share an outline colour with their
         // fill, so the internal divisions disappear and the region reads as one
         // shape. Suburb granularity keeps a thin white edge between neighbours.
-        const edge = granularity === 'region' ? color : '#fff';
+        // Region members share both colour and opacity with their fill, so the
+        // strokes vanish into it and the region reads as one shape. Matching the
+        // opacity matters: a solid stroke over a translucent fill draws seams.
+        const isRegion = granularity === 'region';
+        const fill = over ? 0.3 : 0.72;
         const layer = L.polygon(rings, {
-          color: isSel ? '#0F1C18' : edge,
-          weight: isSel ? 2 : (granularity === 'region' ? 1 : 0.7),
-          opacity: granularity === 'region' ? 1 : 0.85,
+          color: isSel ? '#0F1C18' : (isRegion ? color : '#fff'),
+          weight: isSel ? 2 : (isRegion ? 1.2 : 0.7),
+          opacity: isSel ? 1 : (isRegion ? fill : 0.85),
           fillColor: color,
-          fillOpacity: over ? 0.3 : 0.75,
+          fillOpacity: fill,
         }).addTo(map);
         layer.on('mouseover', e => {
-          layer.setStyle({ fillOpacity: over ? 0.5 : 0.92, weight: 2 });
+          layer.setStyle({ fillOpacity: over ? 0.5 : 0.92, opacity: 1, weight: 2 });
           highlightDot(d.suburb, true);
           showTip(d, e.originalEvent.clientX, e.originalEvent.clientY);
         });
         layer.on('mouseout', () => {
-          layer.setStyle({ fillOpacity: over ? 0.3 : 0.75,
-                           weight: selected === d.suburb ? 2 : (granularity === 'region' ? 1 : 0.7) });
+          const f = over ? 0.3 : 0.72;
+          layer.setStyle({ fillOpacity: f,
+                           opacity: granularity === 'region' ? f : 0.85,
+                           weight: selected === d.suburb ? 2 : (granularity === 'region' ? 1.2 : 0.7) });
           highlightDot(d.suburb, false);
           hideTip();
         });
@@ -1194,9 +1199,11 @@ function highlightMarker(name, on) {
   if (hasShape) {
     Object.entries(shapes).forEach(([k, layer]) => {
       if (!k.startsWith(name + '|')) return;
+      const f = over ? 0.3 : 0.72;
       layer.setStyle({
-        weight: on ? 2 : (selected === name ? 2 : (granularity === 'region' ? 1 : 0.7)),
-        fillOpacity: on ? (over ? 0.5 : 0.92) : (over ? 0.3 : 0.75),
+        weight: on ? 2 : (selected === name ? 2 : (granularity === 'region' ? 1.2 : 0.7)),
+        opacity: on ? 1 : (granularity === 'region' ? f : 0.85),
+        fillOpacity: on ? (over ? 0.5 : 0.92) : f,
       });
     });
     return;
