@@ -24,7 +24,7 @@ DATA = os.path.join(REPO, "data")
 TAG = sys.argv[1] if len(sys.argv) > 1 else "2026_06"
 
 RENT_CSV = os.path.join(DATA, f"auckland_rent_sau_{TAG}.csv")
-CRIME_CSV = os.path.join(DATA, "auckland_crime_by_suburb_2025_405.csv")
+CRIME_CSV = os.path.join(DATA, "auckland_crime_by_area.csv")
 RENT_MAP = os.path.join(DATA, "rent_area_mapping_linz.csv")
 CRIME_MAP = os.path.join(DATA, "crime_area_mapping_linz.csv")
 SUBURBS_GEO = os.path.join(DATA, "linz_suburbs.geojson")
@@ -50,7 +50,7 @@ def main():
     rent_map = load_mapping(RENT_MAP)
     crime_map = load_mapping(CRIME_MAP)
     rent_rows = list(csv.DictReader(open(RENT_CSV)))
-    crime_raw = {r["suburb"].strip(): int(r["total_crimes_2025"])
+    crime_raw = {r["area"].strip(): int(r["total"])
                  for r in csv.DictReader(open(CRIME_CSV))}
 
     geo = json.load(open(SUBURBS_GEO))
@@ -104,7 +104,7 @@ def main():
             "lat": p["lat"], "lng": p["lng"],
             "region": p["region"],
             "population": p["population"],
-            "crime_2025": crime,
+            "crime": crime,
             "rent": rent,        # dwell -> bed -> [median, lq, uq, bonds, mean]
         })
 
@@ -157,7 +157,7 @@ def main():
               separators=(",", ":"), ensure_ascii=False)
 
     have_rent = sum(1 for s in suburbs if any(s["rent"][d] for d in DWELLS))
-    have_crime = sum(1 for s in suburbs if s["crime_2025"] is not None)
+    have_crime = sum(1 for s in suburbs if s["crime"] is not None)
     have_pop = sum(1 for s in suburbs if s["population"])
     print(f"suburbs.json  : {len(suburbs)} suburbs "
           f"({have_rent} with rent, {have_crime} with crime, {have_pop} with population)")

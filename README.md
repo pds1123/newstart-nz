@@ -12,6 +12,7 @@ can weigh cost against safety when choosing where to live.
 | `frontend/index.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
 | `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
+| `scraper/build_crime.py` | Turns the NZ Police Tableau export into `auckland_crime_by_area.csv` |
 | `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |
 | `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
 | `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json`, `source_areas.json` (the fold, per suburb) and `raw_areas.json` |
@@ -28,8 +29,10 @@ June 2026 (covers 2025-07-01 to 2026-06-30). Both the median and the mean are
 carried, along with the lower and upper quartiles and the active bond count.
 
 **Crime** — NZ Police [*Victimisations Time and Place*](https://public.tableau.com/views/VictimisationsTimeandPlace/Summary),
-exported by hand at area-unit level for calendar 2025. The export has a few traps in it —
-see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#refreshing-the-crime-data) before repeating it.
+exported by hand at area-unit level for the same 12 months, July 2025 to June 2026. The
+export arrives as UTF-16, tab separated, one row per victimisation rather than one per
+area, with a trailing period on every area name; `scraper/build_crime.py` turns it into a
+tidy monthly table and documents how to repeat the export.
 
 **Boundaries and population** — LINZ
 [NZ Suburbs and Localities](https://data.linz.govt.nz/layer/113764-nz-suburbs-and-localities/),
@@ -38,7 +41,7 @@ population estimates. *Sourced from the LINZ Data Service and licensed for reuse
 CC BY 4.0.*
 
 The three datasets use different geographic boundaries, so `rent_area_mapping_linz.csv` and
-`crime_area_mapping_linz.csv` fold 548 rent source areas and 405 police source areas onto
+`crime_area_mapping_linz.csv` fold 548 rent source areas and 412 police source areas onto
 the 172 LINZ suburbs of urban Auckland. Coverage: 153/172 have rent figures, 123/172 have
 crime counts, 170/172 have population. Suburbs with no data are shown as such rather than
 dropped.

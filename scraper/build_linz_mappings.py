@@ -201,9 +201,9 @@ def main():
 
     rent_src = {r["area"].strip() for r in
                 csv.DictReader(open(os.path.join(DATA, "auckland_rent_sau_2026_06.csv")))}
-    crime_src = {r["suburb"].strip() for r in
+    crime_src = {r["area"].strip() for r in
                  csv.DictReader(open(os.path.join(DATA,
-                     "auckland_crime_by_suburb_2025_405.csv")))}
+                     "auckland_crime_by_area.csv")))}
 
     from collections import Counter
     for label, src, old_name, out_name in [
