@@ -14,7 +14,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(REPO, "data")
 
 TARGETS = {
-    "frontend/prototype_v1.html": ["SUBURB_DATA", "SUBURB_GEO", "SOURCE_AREAS"],
+    "frontend/index.html": ["SUBURB_DATA", "SUBURB_GEO", "SOURCE_AREAS"],
 }
 
 # raw_areas.json is still built — it records how each source area folds onto a

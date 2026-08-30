@@ -9,7 +9,7 @@ can weigh cost against safety when choosing where to live.
 
 | Path | Description |
 | --- | --- |
-| `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
+| `frontend/index.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
 | `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
 | `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |

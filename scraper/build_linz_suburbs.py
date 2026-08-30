@@ -91,7 +91,7 @@ def centroid(rs):
 
 def load_previous_regions():
     """Seed regions from the hand-made assignments already in the frontend."""
-    html = open(os.path.join(REPO, "frontend", "prototype_v1.html")).read()
+    html = open(os.path.join(REPO, "frontend", "index.html")).read()
     blk = re.search(r"const REGION_SUBURBS = \{(.*?)\n\};", html, re.S).group(1)
     out = {}
     for m in re.finditer(r"'([^']+)':\s*\[(.*?)\]", blk, re.S):
