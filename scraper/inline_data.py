@@ -1,6 +1,6 @@
 """Inline the built JSON into the standalone HTML pages.
 
-The frontend has no build step — data lives directly in the file as
+The dashboard has no build step — data lives directly in the file as
 `const SUBURB_DATA = [...]` and `const SUBURB_GEO = {...}`. This swaps those
 assignments for the current contents of data/.
 
@@ -15,7 +15,6 @@ DATA = os.path.join(REPO, "data")
 
 TARGETS = {
     "frontend/prototype_v1.html": ["SUBURB_DATA", "SUBURB_GEO", "SOURCE_AREAS"],
-    "frontend/auckland_map.html": ["SUBURB_DATA"],
 }
 
 # raw_areas.json is still built — it records how each source area folds onto a

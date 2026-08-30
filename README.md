@@ -10,16 +10,15 @@ can weigh cost against safety when choosing where to live.
 | Path | Description |
 | --- | --- |
 | `frontend/prototype_v1.html` | Main dashboard — a board of tiles: map, rent and safety rankings, spread, region comparison, scatter |
-| `frontend/auckland_map.html` | Dark-theme suburb explorer — rent / crime / combined view modes |
 | `data/linz_suburbs.geojson` | LINZ suburb polygons, population and regions |
 | `scraper/build_linz_suburbs.py` | Builds that file from the LINZ export |
 | `scraper/build_linz_mappings.py` | Rebuilds the source-area mapping tables against LINZ names |
 | `scraper/fetch_rent.py` | Pulls SAU and ward rent data from the MBIE API into `data/` |
 | `scraper/build_dataset.py` | Folds source areas onto the LINZ suburbs, writes `suburbs.json`, `source_areas.json` (the fold, per suburb) and `raw_areas.json` |
-| `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML pages |
+| `scraper/inline_data.py` | Inlines the built JSON into the standalone HTML page |
 | `scraper/test_mbie_api.py` | Probe for what the API currently serves |
 
-All frontend files are standalone HTML — open one in a browser, no build step.
+The dashboard is standalone HTML — open it in a browser, no build step.
 
 ## Data sources
 
